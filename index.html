@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>IP WHOIS</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,400;14..32,500;14..32,600;14..32,700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="base.css" />
+  <link rel="stylesheet" href="style.css" />
+  <script defer src="app.js"></script>
+</head>
+<body>
+  <div class="bg-grid" aria-hidden="true"></div>
+  <header class="site-header container">
+    <div class="brand">
+      <svg width="32" height="32" viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="2.5" y="2.5" width="19" height="19" rx="5" stroke="currentColor"/><path d="M8 10h2v4H8zm6 0h2v4h-2z" stroke="currentColor" stroke-width="1.5"/></svg>
+      <div>
+        <h1>IP WHOIS</h1><p>v4 · v6 registry lookup</p>
+      </div>
+    </div>
+    <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme">☼</button>
+  </header>
+
+  <main>
+    <section class="hero container">
+      <div class="eyebrow">RDAP · WHOIS · REGISTRY DATA</div>
+      <h2>IP address <em>intelligence,</em><br/>in one query.</h2>
+      <p>Query authoritative RDAP records from ARIN, RIPE NCC, APNIC, AFRINIC, and LACNIC, then enrich with public geolocation data.</p>
+
+      <form id="lookup-form" novalidate>
+        <div class="input-wrap">
+          <span>whois ·</span>
+          <input id="ip-input" placeholder="8.8.8.8 or 2001:4860:4860::8888" autocomplete="off" />
+          <button type="submit">Lookup →</button>
+        </div>
+        <p id="validation-message" class="validation-message" aria-live="polite"></p>
+      </form>
+
+      <div class="example-block">
+        <div><strong>IPv4:</strong>
+          <button class="chip" data-example="8.8.8.8">8.8.8.8</button>
+          <button class="chip" data-example="1.1.1.1">1.1.1.1</button>
+          <button class="chip" data-example="140.82.121.4">140.82.121.4</button>
+        </div>
+        <div><strong>IPv6:</strong>
+          <button class="chip" data-example="2001:4860:4860::8888">2001:4860:4860::8888</button>
+          <button class="chip" data-example="2606:4700:4700::1111">2606:4700:4700::1111</button>
+          <button class="chip" data-example="2a00:1450:4001:81f::200e">2a00:1450:4001:81f::200e</button>
+          <button class="chip" data-example="2400:cb00:2049:1::a29f:1804">2400:cb00:2049:1::a29f:1804</button>
+          <button class="chip" data-example="2800:3f0:4001:81f::2003">2800:3f0:4001:81f::2003</button>
+          <button class="chip" data-example="2c0f:fe40::1">2c0f:fe40::1</button>
+        </div>
+      </div>
+    </section>
+
+    <section id="results-section"><div class="container" id="results-container"></div></section>
+
+    <section id="how-it-works" class="container how">
+      <h3>How it works</h3>
+      <p>This tool validates the IP locally, fetches RDAP bootstrap data, follows redirects to the responsible registry, and adds geolocation from public no-auth providers.</p>
+      <table><thead><tr><th>Registry</th><th>Region</th></tr></thead><tbody>
+        <tr><td>ARIN</td><td>North America</td></tr><tr><td>RIPE NCC</td><td>Europe, Middle East, Central Asia</td></tr>
+        <tr><td>APNIC</td><td>Asia Pacific</td></tr><tr><td>LACNIC</td><td>Latin America & Caribbean</td></tr><tr><td>AFRINIC</td><td>Africa</td></tr>
+      </tbody></table>
+    </section>
+  </main>
+</body>
+</html>
