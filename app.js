@@ -29,7 +29,10 @@ async function lookup(ip,version){
  if(!rdapResp.ok) throw new Error(`RDAP failed (${rdapResp.status})`);
  const rdap=await rdapResp.json(); const final=rdapResp.url;
  const rir=RIR_MAP.find(r=>final.includes(r.k)||JSON.stringify(rdap.links||[]).includes(r.k)||String(rdap.port43||'').includes(r.k.split('.')[0]))||{code:'UNKNOWN',name:'Unknown',region:'Unknown',website:'#',color:'#2bd4a3'};
- let geo=null; for(const u of [`https://ipinfo.io/${ip}/json`,`https://ipwho.is/${ip}`,`https://ipapi.co/${ip}/json/`]){try{const g=await fetch(u);if(!g.ok) continue; const j=await g.json(); if(j&&(!j.error&&!j.success===false)){geo=j;break;}}catch{}}
+ let geo=null; for(const u of [`https://ipinfo.io/${ip}/json`,`https://ipwho.is/${ip}`,`https://ipapi.co/${ip}/json/`]){try{const g=await fetch(u);if(!g.ok) continue; const j=await g.json();
+  const failed = !j || j.success===false || !!j.error || !!j.message;
+  if(!failed){geo=j;break;}}
+  catch{}}
  return {rdap,final,rir,geo,ip,version};
 }
 const fmtDate=d=>d?new Date(d).toISOString().slice(0,16).replace('T',' ')+' UTC':'';
