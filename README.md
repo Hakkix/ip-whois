@@ -26,3 +26,24 @@ The app supports JSON, Text, and Markdown report exports from the result summary
 Validated target queries:
 - `8.8.8.8` (ARIN)
 - `2a00:1450:4001:81f::200e` (RIPE NCC)
+
+
+## Deploy to Vercel
+This is a static app, so Vercel can deploy it with zero build step.
+
+### Option 1: Vercel dashboard (fastest)
+1. Push this repo to GitHub/GitLab/Bitbucket.
+2. In Vercel, click **Add New → Project** and import the repo.
+3. Framework preset: **Other**.
+4. Build command: *(leave empty)*.
+5. Output directory: *(leave empty)*.
+6. Click **Deploy**.
+
+### Option 2: Vercel CLI
+```bash
+npm i -g vercel
+vercel
+vercel --prod
+```
+
+The included `vercel.json` adds clean URLs and baseline security headers for static hosting.
