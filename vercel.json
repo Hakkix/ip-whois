@@ -6,6 +6,7 @@
     {
       "source": "/(.*)",
       "headers": [
+        { "key": "Content-Security-Policy", "value": "default-src 'self'; script-src 'self'; style-src 'self' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; connect-src https://rdap-bootstrap.arin.net https://*.arin.net https://*.ripe.net https://*.apnic.net https://*.lacnic.net https://afrinic.net https://ipinfo.io https://ipwho.is https://ipapi.co; img-src 'none'; frame-ancestors 'none'" },
         { "key": "X-Content-Type-Options", "value": "nosniff" },
         { "key": "Referrer-Policy", "value": "strict-origin-when-cross-origin" },
         { "key": "X-Frame-Options", "value": "DENY" }
