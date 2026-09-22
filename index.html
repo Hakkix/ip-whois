@@ -3,7 +3,8 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>IP WHOIS</title>
+  <title>IP Intelligence</title>
+  <meta name="description" content="Network intelligence for IP addresses and hostnames." />
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,400;14..32,500;14..32,600;14..32,700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
@@ -14,64 +15,122 @@
   <script type="module" src="app.js"></script>
 </head>
 <body>
-  <div class="bg-grid" aria-hidden="true"></div>
-  <header class="site-header container">
-    <div class="brand">
-      <svg width="32" height="32" viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="2.5" y="2.5" width="19" height="19" rx="5" stroke="currentColor"/><path d="M8 10h2v4H8zm6 0h2v4h-2z" stroke="currentColor" stroke-width="1.5"/></svg>
-      <div>
-        <h1>IP WHOIS</h1><p>v4 · v6 · DNS registry lookup</p>
+  <a class="skip-link" href="#main-content">Skip to content</a>
+
+  <header class="app-header" id="app-header">
+    <div class="header-inner container">
+      <div class="header-top">
+        <button type="button" class="brand" id="brand-home" aria-label="IP Intelligence — return to home">
+          <span class="brand-mark" aria-hidden="true">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><rect x="2.5" y="2.5" width="19" height="19" rx="5" stroke="currentColor"/><path d="M8 10h2v4H8zm6 0h2v4h-2z" stroke="currentColor" stroke-width="1.5"/></svg>
+          </span>
+          <span class="brand-text">
+            <span class="brand-name">IP Intelligence</span>
+            <span class="brand-sub">Network intelligence for IP addresses and hostnames</span>
+          </span>
+        </button>
+        <nav class="header-actions" aria-label="Application actions">
+          <button type="button" id="my-ip-btn" class="btn btn-ghost" hidden>My IP</button>
+          <div class="export-menu-wrap">
+            <button type="button" id="export-btn" class="btn btn-ghost" hidden aria-haspopup="true" aria-expanded="false">Export</button>
+            <div class="export-menu" id="export-menu" role="menu" hidden>
+              <button type="button" class="export-menu-item" role="menuitem" data-export="json">Copy JSON</button>
+              <button type="button" class="export-menu-item" role="menuitem" data-export="markdown">Copy Markdown</button>
+              <button type="button" class="export-menu-item" role="menuitem" data-export="text">Copy Text</button>
+            </div>
+          </div>
+          <button type="button" id="about-btn" class="btn btn-ghost">About</button>
+        </nav>
       </div>
+
+      <form id="lookup-form" class="search-form" novalidate>
+        <label for="ip-input" class="sr-only">Enter IP address or hostname</label>
+        <div class="search-input-wrap">
+          <input id="ip-input" type="text" placeholder="Enter IP address or hostname" autocomplete="off" spellcheck="false" />
+          <button type="submit" class="btn btn-primary">Investigate</button>
+        </div>
+        <span class="kbd-hint" aria-hidden="true">Enter to investigate</span>
+      </form>
+      <p id="validation-message" class="validation-message" role="alert"></p>
     </div>
-    <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme">☼</button>
   </header>
 
-  <main>
-    <section class="hero container">
-      <div class="eyebrow">RDAP · WHOIS · REGISTRY DATA</div>
-      <h2>IP address <em>intelligence,</em><br/>in one query.</h2>
-      <p>Query authoritative RDAP records from ARIN, RIPE NCC, APNIC, AFRINIC, and LACNIC, then enrich with ASN, reverse DNS, and approximate geolocation. DNS hostnames are resolved to an IP first. Every report cites where each field came from.</p>
-
-      <form id="lookup-form" novalidate>
-        <div class="input-wrap">
-          <span>whois ·</span>
-          <input id="ip-input" placeholder="8.8.8.8, 2001:4860:4860::8888, or example.com" autocomplete="off" />
-          <button type="submit">Lookup →</button>
-        </div>
-        <p id="validation-message" class="validation-message" aria-live="polite"></p>
-      </form>
-
-      <div class="example-block">
-        <div><strong>IPv4:</strong>
-          <button class="chip" data-example="8.8.8.8">8.8.8.8</button>
-          <button class="chip" data-example="1.1.1.1">1.1.1.1</button>
-          <button class="chip" data-example="140.82.121.4">140.82.121.4</button>
-        </div>
-        <div><strong>IPv6:</strong>
-          <button class="chip" data-example="2001:4860:4860::8888">2001:4860:4860::8888</button>
-          <button class="chip" data-example="2606:4700:4700::1111">2606:4700:4700::1111</button>
-          <button class="chip" data-example="2a00:1450:4001:81f::200e">2a00:1450:4001:81f::200e</button>
-          <button class="chip" data-example="2400:cb00:2049:1::a29f:1804">2400:cb00:2049:1::a29f:1804</button>
-          <button class="chip" data-example="2800:3f0:4001:81f::2003">2800:3f0:4001:81f::2003</button>
-          <button class="chip" data-example="2c0f:fe40::1">2c0f:fe40::1</button>
-        </div>
-        <div><strong>DNS name:</strong>
-          <button class="chip" data-example="google.com">google.com</button>
-          <button class="chip" data-example="github.com">github.com</button>
-          <button class="chip" data-example="cloudflare.com">cloudflare.com</button>
-        </div>
-      </div>
+  <main id="main-content" class="container">
+    <section id="landing-view" class="landing-view">
+      <div id="self-ip-hero" class="self-ip-hero"></div>
+      <div id="intelligence-tiles" class="intelligence-tiles"></div>
+      <div id="source-status-strip" class="source-status-strip" role="status"></div>
+      <p class="privacy-note">Your IP is detected for this session only and is not stored.</p>
+      <details id="recent-lookups" class="recent-lookups" hidden>
+        <summary>Recent lookups</summary>
+        <ul id="recent-lookups-list" class="recent-lookups-list"></ul>
+      </details>
     </section>
 
-    <section id="results-section"><div class="container" id="results-container"></div></section>
+    <section id="chooser-view" class="chooser-view" hidden></section>
 
-    <section id="how-it-works" class="container how">
-      <h3>How it works</h3>
-      <p>This tool validates the query locally, fetches RDAP bootstrap data, and follows redirects to the responsible registry. A DNS hostname is first resolved to an IP address via DNS-over-HTTPS (Cloudflare, then Google). Reverse DNS, ASN, and geolocation are fetched in parallel from public no-auth providers; if one is unavailable, the rest of the report still renders. Geolocation reflects the network's approximate location, not a person's or device's exact position.</p>
-      <table><thead><tr><th>Registry</th><th>Region</th></tr></thead><tbody>
-        <tr><td>ARIN</td><td>North America</td></tr><tr><td>RIPE NCC</td><td>Europe, Middle East, Central Asia</td></tr>
-        <tr><td>APNIC</td><td>Asia Pacific</td></tr><tr><td>LACNIC</td><td>Latin America & Caribbean</td></tr><tr><td>AFRINIC</td><td>Africa</td></tr>
-      </tbody></table>
+    <section id="investigation-view" class="investigation-view" hidden>
+      <div id="investigation-container"></div>
     </section>
   </main>
+
+  <div id="toast-region" class="toast-region" aria-live="polite"></div>
+
+  <div id="about-modal" class="modal-overlay" hidden>
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="about-title" tabindex="-1">
+      <button type="button" class="modal-close" data-modal-close aria-label="Close">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18M6 6l12 12"/></svg>
+      </button>
+      <h2 id="about-title">About IP Intelligence</h2>
+
+      <section id="about-section-about" class="about-section">
+        <h3>About</h3>
+        <p>IP Intelligence combines RDAP registration data, ASN/network registration, DNS, reverse DNS, and approximate IP geolocation into a single report for an IP address or hostname.</p>
+      </section>
+
+      <section id="about-section-sources" class="about-section">
+        <h3>Data Sources</h3>
+        <p>RDAP information comes from the relevant regional Internet registry (ARIN, RIPE NCC, APNIC, LACNIC, or AFRINIC) via RDAP bootstrap. DNS information — forward resolution and reverse (PTR) lookups — comes from DNS-over-HTTPS providers used by this application. Approximate geolocation and ASN data come from external GeoIP providers, tried in order as a cascade. A provider fallback may be used automatically when one source fails. Not every value comes from the same authority.</p>
+      </section>
+
+      <section id="about-section-limitations" class="about-section">
+        <h3>Limitations</h3>
+        <ul>
+          <li>GeoIP location is approximate.</li>
+          <li>Network location is not device or person location.</li>
+          <li>PTR (reverse DNS) records may not exist.</li>
+          <li>Registry data can be stale or incomplete.</li>
+          <li>Different providers can disagree with each other.</li>
+          <li>Hostname lookups may resolve to multiple IP addresses.</li>
+          <li>ASN and GeoIP information can change over time.</li>
+        </ul>
+      </section>
+
+      <section id="about-section-privacy" class="about-section">
+        <h3>Privacy</h3>
+        <ul>
+          <li>Your public IP is used only to populate the self-IP display.</li>
+          <li>Session lookup history is kept only for the current browser session (<code>sessionStorage</code>), never persisted.</li>
+          <li>No persistent lookup history is stored by this application.</li>
+          <li>No browser GPS/geolocation permission is ever requested.</li>
+          <li>Queried IP geolocation concerns the investigated IP address, not your physical GPS position.</li>
+        </ul>
+      </section>
+
+      <section id="about-section-github" class="about-section">
+        <h3>GitHub</h3>
+        <p><a href="https://github.com/Hakkix/ip-whois" target="_blank" rel="noopener noreferrer">github.com/Hakkix/ip-whois</a></p>
+      </section>
+    </div>
+  </div>
+
+  <footer class="app-footer">
+    <div class="container footer-inner">
+      <a href="https://github.com/Hakkix/ip-whois" target="_blank" rel="noopener noreferrer">GitHub</a>
+      <button type="button" id="footer-privacy" class="footer-link">Privacy</button>
+      <button type="button" id="footer-sources" class="footer-link">Data Sources</button>
+      <a id="footer-version" href="https://github.com/Hakkix/ip-whois/releases" target="_blank" rel="noopener noreferrer">v2.0.0</a>
+    </div>
+  </footer>
 </body>
 </html>

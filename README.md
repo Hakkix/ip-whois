@@ -1,10 +1,10 @@
-# IP WHOIS
+# IP Intelligence
 
 **Live application:** https://ip-whois.vercel.app
 
-A lightweight, browser-based IP intelligence tool. Given an IPv4 address, an IPv6 address, or a hostname, it combines authoritative RDAP registration data, DNS (forward and reverse), ASN information, and approximate geolocation into a single source-attributed report — viewable in the browser, or exported as JSON, Markdown, or plain text.
+A lightweight, browser-based IP intelligence tool. The landing page auto-detects and displays your own public IP (org, ASN, approximate location, reverse DNS), and doubles as an investigation console: given an IPv4 address, an IPv6 address, or a hostname, it combines authoritative RDAP registration data, DNS (forward and reverse), ASN information, and approximate geolocation into a single source-attributed report — viewable in the browser, or exported as JSON, Markdown, or plain text.
 
-It is a static site with no backend, no build step, and no accounts: everything runs client-side and nothing about your query is stored server-side.
+It is a static site with no backend, no build step, and no accounts: everything runs client-side and nothing about your query is stored server-side. Recent lookups are kept only in `sessionStorage` for the current browser session.
 
 ## What it does
 
@@ -66,25 +66,32 @@ Static site, no build step, no frontend framework:
 ```
 /
 ├── index.html        entry point
-├── app.js             orchestration: pipeline, DOM event wiring
+├── app.js             orchestration: view state, self-IP pipeline, investigation pipeline, DOM event wiring
 ├── style.css / base.css
 ├── js/
 │   ├── utils.js        input validation, PTR generation, CIDR math
 │   ├── dns.js           DNS-over-HTTPS forward + reverse (PTR) lookups
 │   ├── rdap.js           RDAP fetch + per-RIR normalization
-│   ├── geo.js             geolocation provider cascade + ASN extraction
+│   ├── geo.js             geolocation provider cascade (per-IP and self) + ASN extraction
 │   ├── report.js           normalized report model + JSON/Markdown/Text export
-│   └── render.js            safe DOM rendering (no innerHTML with external data)
+│   ├── render.js            investigation report DOM (no innerHTML with external data)
+│   ├── landing.js           self-IP hero, intelligence tiles, source-status strip
+│   ├── chooser.js            multi-address hostname chooser
+│   ├── history.js             session-only recent-lookup history (sessionStorage)
+│   ├── about.js                About modal (focus trap, section targeting)
+│   ├── toast.js                 non-blocking toast/status feedback
+│   └── domkit.js                 shared safe DOM-construction helpers
 ├── vendor/leaflet/    vendored Leaflet (map tiles rendering), no CDN dependency
 ├── tests/
 │   ├── normalize.test.js  input parsing, PTR, CIDR, RDAP/geo normalization
 │   ├── report.test.js      report model + export consistency
 │   ├── security.test.js     XSS-safety of the DOM renderer
+│   ├── resilience.test.js    provider-failure paths
 │   └── fixtures/            recorded provider responses, no live API calls in tests
 └── vercel.json
 ```
 
-Processing pipeline: input is normalized and classified (IP vs. hostname) → a hostname is resolved to an IP → RDAP, geolocation, and reverse DNS are looked up **in parallel** (a failure in one does not block the others) → all results are normalized into one report object → the UI and every export format render from that same object.
+Landing state: the visitor's public IP is detected via the geolocation provider cascade (self-lookup) and rendered as soon as it's known, then org/ASN/location/reverse-DNS enrich progressively. Investigation state: input is normalized and classified (IP vs. hostname) → a hostname is resolved to an IP (multiple results show an address chooser) → RDAP, geolocation, and reverse DNS are looked up **in parallel** (a failure in one does not block the others) → all results are normalized into one report object → the UI and every export format render from that same object.
 
 ## Security
 
