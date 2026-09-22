@@ -17,7 +17,7 @@
     <div class="brand">
       <svg width="32" height="32" viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="2.5" y="2.5" width="19" height="19" rx="5" stroke="currentColor"/><path d="M8 10h2v4H8zm6 0h2v4h-2z" stroke="currentColor" stroke-width="1.5"/></svg>
       <div>
-        <h1>IP WHOIS</h1><p>v4 · v6 registry lookup</p>
+        <h1>IP WHOIS</h1><p>v4 · v6 · DNS registry lookup</p>
       </div>
     </div>
     <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme">☼</button>
@@ -27,12 +27,12 @@
     <section class="hero container">
       <div class="eyebrow">RDAP · WHOIS · REGISTRY DATA</div>
       <h2>IP address <em>intelligence,</em><br/>in one query.</h2>
-      <p>Query authoritative RDAP records from ARIN, RIPE NCC, APNIC, AFRINIC, and LACNIC, then enrich with public geolocation data.</p>
+      <p>Query authoritative RDAP records from ARIN, RIPE NCC, APNIC, AFRINIC, and LACNIC, then enrich with public geolocation data. DNS hostnames are resolved to an IP first.</p>
 
       <form id="lookup-form" novalidate>
         <div class="input-wrap">
           <span>whois ·</span>
-          <input id="ip-input" placeholder="8.8.8.8 or 2001:4860:4860::8888" autocomplete="off" />
+          <input id="ip-input" placeholder="8.8.8.8, 2001:4860:4860::8888, or example.com" autocomplete="off" />
           <button type="submit">Lookup →</button>
         </div>
         <p id="validation-message" class="validation-message" aria-live="polite"></p>
@@ -52,6 +52,11 @@
           <button class="chip" data-example="2800:3f0:4001:81f::2003">2800:3f0:4001:81f::2003</button>
           <button class="chip" data-example="2c0f:fe40::1">2c0f:fe40::1</button>
         </div>
+        <div><strong>DNS name:</strong>
+          <button class="chip" data-example="google.com">google.com</button>
+          <button class="chip" data-example="github.com">github.com</button>
+          <button class="chip" data-example="cloudflare.com">cloudflare.com</button>
+        </div>
       </div>
     </section>
 
@@ -59,7 +64,7 @@
 
     <section id="how-it-works" class="container how">
       <h3>How it works</h3>
-      <p>This tool validates the IP locally, fetches RDAP bootstrap data, follows redirects to the responsible registry, and adds geolocation from public no-auth providers.</p>
+      <p>This tool validates the IP locally, fetches RDAP bootstrap data, follows redirects to the responsible registry, and adds geolocation from public no-auth providers. A DNS hostname is first resolved to an IP address via DNS-over-HTTPS (Cloudflare, then Google), then looked up the same way.</p>
       <table><thead><tr><th>Registry</th><th>Region</th></tr></thead><tbody>
         <tr><td>ARIN</td><td>North America</td></tr><tr><td>RIPE NCC</td><td>Europe, Middle East, Central Asia</td></tr>
         <tr><td>APNIC</td><td>Asia Pacific</td></tr><tr><td>LACNIC</td><td>Latin America & Caribbean</td></tr><tr><td>AFRINIC</td><td>Africa</td></tr>
