@@ -1,0 +1,24 @@
+{
+  "handle": "LACNIC-EXAMPLE",
+  "name": "LACNIC-BR-EXAMPLE",
+  "type": "ALLOCATION",
+  "startAddress": "2800:3f0::",
+  "endAddress": "2800:3f0:ffff:ffff:ffff:ffff:ffff:ffff",
+  "country": "BR",
+  "status": ["active"],
+  "entities": [
+    {
+      "handle": "LACNIC-REG",
+      "roles": ["registrant"],
+      "vcardArray": ["vcard", [
+        ["fn", {}, "text", "Example Brasil Telecom"],
+        ["org", {}, "text", "Example Brasil Telecom"]
+      ]]
+    }
+  ],
+  "events": [
+    { "eventAction": "registration", "eventDate": "2012-02-10T00:00:00Z" }
+  ],
+  "remarks": [],
+  "links": [{ "href": "https://rdap.lacnic.net/rdap/ip/2800:3f0::/32", "rel": "self" }]
+}

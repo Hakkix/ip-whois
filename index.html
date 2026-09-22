@@ -9,7 +9,9 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,400;14..32,500;14..32,600;14..32,700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="base.css" />
   <link rel="stylesheet" href="style.css" />
-  <script defer src="app.js"></script>
+  <link rel="stylesheet" href="vendor/leaflet/leaflet.css" />
+  <script src="vendor/leaflet/leaflet.js" defer></script>
+  <script type="module" src="app.js"></script>
 </head>
 <body>
   <div class="bg-grid" aria-hidden="true"></div>
@@ -27,7 +29,7 @@
     <section class="hero container">
       <div class="eyebrow">RDAP · WHOIS · REGISTRY DATA</div>
       <h2>IP address <em>intelligence,</em><br/>in one query.</h2>
-      <p>Query authoritative RDAP records from ARIN, RIPE NCC, APNIC, AFRINIC, and LACNIC, then enrich with public geolocation data. DNS hostnames are resolved to an IP first.</p>
+      <p>Query authoritative RDAP records from ARIN, RIPE NCC, APNIC, AFRINIC, and LACNIC, then enrich with ASN, reverse DNS, and approximate geolocation. DNS hostnames are resolved to an IP first. Every report cites where each field came from.</p>
 
       <form id="lookup-form" novalidate>
         <div class="input-wrap">
@@ -64,7 +66,7 @@
 
     <section id="how-it-works" class="container how">
       <h3>How it works</h3>
-      <p>This tool validates the IP locally, fetches RDAP bootstrap data, follows redirects to the responsible registry, and adds geolocation from public no-auth providers. A DNS hostname is first resolved to an IP address via DNS-over-HTTPS (Cloudflare, then Google), then looked up the same way.</p>
+      <p>This tool validates the query locally, fetches RDAP bootstrap data, and follows redirects to the responsible registry. A DNS hostname is first resolved to an IP address via DNS-over-HTTPS (Cloudflare, then Google). Reverse DNS, ASN, and geolocation are fetched in parallel from public no-auth providers; if one is unavailable, the rest of the report still renders. Geolocation reflects the network's approximate location, not a person's or device's exact position.</p>
       <table><thead><tr><th>Registry</th><th>Region</th></tr></thead><tbody>
         <tr><td>ARIN</td><td>North America</td></tr><tr><td>RIPE NCC</td><td>Europe, Middle East, Central Asia</td></tr>
         <tr><td>APNIC</td><td>Asia Pacific</td></tr><tr><td>LACNIC</td><td>Latin America & Caribbean</td></tr><tr><td>AFRINIC</td><td>Africa</td></tr>

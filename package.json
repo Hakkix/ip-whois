@@ -1,0 +1,10 @@
+{
+  "name": "ip-whois",
+  "version": "2.0.0",
+  "private": true,
+  "description": "Lightweight browser-based IP intelligence tool (RDAP, DNS, ASN, geolocation).",
+  "type": "module",
+  "scripts": {
+    "test": "node --test"
+  }
+}

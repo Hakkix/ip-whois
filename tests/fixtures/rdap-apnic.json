@@ -1,0 +1,26 @@
+{
+  "handle": "APNIC-EXAMPLE",
+  "name": "APNIC-JP-EXAMPLE",
+  "type": "ALLOCATED PORTABLE",
+  "startAddress": "203.0.0.0",
+  "endAddress": "203.0.0.255",
+  "country": "JP",
+  "status": ["active"],
+  "cidr0_cidrs": [{ "v4prefix": "203.0.0.0", "length": 24 }],
+  "entities": [
+    {
+      "handle": "APNIC-ABUSE",
+      "roles": ["abuse"],
+      "vcardArray": ["vcard", [
+        ["fn", {}, "text", "APNIC Abuse"],
+        ["email", {}, "text", "abuse@example.jp"]
+      ]]
+    }
+  ],
+  "events": [
+    { "eventAction": "registration", "eventDate": "2005-06-15T00:00:00Z" },
+    { "eventAction": "last changed", "eventDate": "2022-11-20T00:00:00Z" }
+  ],
+  "remarks": [{ "title": "Description", "description": ["Example APNIC allocation"] }],
+  "links": [{ "href": "https://rdap.apnic.net/ip/203.0.0.0/24", "rel": "self" }]
+}
