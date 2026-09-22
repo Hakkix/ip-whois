@@ -6,15 +6,17 @@ import { fetchWithTimeout } from './utils.js';
 export const GEO_PROVIDERS = ['ipinfo.io', 'ipwho.is', 'ipapi.co'];
 
 function geoUrl(providerId, ip) {
+  // Omitting the IP asks the provider to resolve the caller's own address —
+  // used for the landing-page self-IP panel.
   switch (providerId) {
     case 'ipinfo.io':
-      return `https://ipinfo.io/${ip}/json`;
+      return ip ? `https://ipinfo.io/${ip}/json` : 'https://ipinfo.io/json';
     case 'ipwho.is':
-      return `https://ipwho.is/${ip}`;
+      return ip ? `https://ipwho.is/${ip}` : 'https://ipwho.is/';
     case 'ipapi.co':
       // Literal colons in the path — URL-encoding an IPv6 address here
       // trips ipapi.co's WAF and returns 403.
-      return `https://ipapi.co/${ip}/json/`;
+      return ip ? `https://ipapi.co/${ip}/json/` : 'https://ipapi.co/json/';
     default:
       return null;
   }
@@ -134,4 +136,21 @@ export function normalizeAsn(raw, providerId) {
     country_code: null,
     prefix: null,
   };
+}
+
+// The self-lookup ('no ip' cascade) response also reports the caller's own
+// address — every one of the three providers exposes it under `ip`.
+export function selfIpFromRaw(raw) {
+  const ip = raw && typeof raw.ip === 'string' ? raw.ip.trim() : null;
+  return ip || null;
+}
+
+// Fetches the caller's own IP + ASN + geolocation in one cascaded call.
+// Returns { ip, raw, provider } or null if every provider failed/timed out.
+export async function fetchSelfGeo(timeoutMs = 6000) {
+  const result = await fetchGeo(null, timeoutMs);
+  if (!result) return null;
+  const ip = selfIpFromRaw(result.raw);
+  if (!ip) return null;
+  return { ip, raw: result.raw, provider: result.provider };
 }
