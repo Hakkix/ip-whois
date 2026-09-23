@@ -11,7 +11,7 @@
         { "key": "X-Frame-Options", "value": "DENY" },
         {
           "key": "Content-Security-Policy",
-          "value": "default-src 'self'; script-src 'self'; style-src 'self' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' https://*.tile.openstreetmap.org; connect-src 'self' https://rdap-bootstrap.arin.net https://rdap.arin.net https://rdap.db.ripe.net https://rdap.apnic.net https://rdap.lacnic.net https://rdap.afrinic.net https://cloudflare-dns.com https://dns.google https://ipinfo.io https://ipwho.is https://ipapi.co; object-src 'none'; base-uri 'none'; frame-ancestors 'none'"
+          "value": "default-src 'self'; script-src 'self'; style-src 'self'; font-src 'self'; img-src 'self' https://*.tile.openstreetmap.org; connect-src 'self' https://rdap-bootstrap.arin.net https://rdap.arin.net https://rdap.db.ripe.net https://rdap.apnic.net https://rdap.lacnic.net https://rdap.afrinic.net https://cloudflare-dns.com https://dns.google https://ipinfo.io https://ipwho.is https://ipapi.co; object-src 'none'; base-uri 'none'; frame-ancestors 'none'"
         }
       ]
     }

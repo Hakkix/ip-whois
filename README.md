@@ -57,7 +57,9 @@ Every format is generated from the same normalized internal report model (schema
 
 - No browser/device geolocation is requested or used. All geolocation concerns the **queried IP address**, resolved via third-party geolocation APIs.
 - No accounts, no server-side lookup history, no database.
-- Queries call the RDAP/DNS/geolocation providers listed above directly from your browser.
+- Queries call the RDAP/DNS/geolocation providers listed above directly from your browser, so those providers see your IP address. Reports with a map also load tiles from OpenStreetMap.
+- The landing page detects your own IP by calling a third-party GeoIP provider (ipinfo.io, falling back to ipwho.is and ipapi.co). This is skipped when the page is opened with a `?q=` report link.
+- Fonts (Inter, JetBrains Mono) are self-hosted under `vendor/fonts/`; no request goes to Google Fonts.
 
 ## Architecture
 

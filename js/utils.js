@@ -131,26 +131,39 @@ export function ptrNameFor(ip, version) {
   return version === 4 ? ptrNameForIPv4(ip) : ptrNameForIPv6(ip);
 }
 
+const RESERVED_V4 = [
+  ['0.0.0.0', 8], ['10.0.0.0', 8], ['100.64.0.0', 10], ['127.0.0.0', 8],
+  ['169.254.0.0', 16], ['172.16.0.0', 12], ['192.0.0.0', 24], ['192.0.2.0', 24],
+  ['192.168.0.0', 16], ['198.18.0.0', 15], ['198.51.100.0', 24], ['203.0.113.0', 24],
+  ['224.0.0.0', 4], ['240.0.0.0', 4],
+];
+
+const RESERVED_V6 = [
+  ['::', 128], ['::1', 128], ['2001:db8::', 32], ['fc00::', 7], ['fe80::', 10], ['ff00::', 8],
+];
+
+// Prefixes that embed an IPv4 address in their low 32 bits; the address is
+// reserved when the embedded IPv4 address is.
+const V4_EMBEDDING_V6 = [['::ffff:0:0', 96], ['64:ff9b::', 96]];
+
+function inPrefix(x, base, prefixLen, bits) {
+  const shift = BigInt(bits - prefixLen);
+  return x >> shift === base >> shift;
+}
+
+// Compares numeric values, so any textual form of an address (leading zeros,
+// compressed or expanded IPv6) is classified the same way.
 export function isReservedIP(version, ip) {
   if (version === 4) {
-    const octets = ip.split('.').map(Number);
-    const x = ((octets[0] << 24) | (octets[1] << 16) | (octets[2] << 8) | octets[3]) >>> 0;
-    const ranges = [
-      ['0.0.0.0', 0xff000000], ['10.0.0.0', 0xff000000], ['127.0.0.0', 0xff000000],
-      ['169.254.0.0', 0xffff0000], ['172.16.0.0', 0xfff00000], ['192.0.0.0', 0xffffff00],
-      ['192.0.2.0', 0xffffff00], ['192.168.0.0', 0xffff0000], ['198.18.0.0', 0xfffe0000],
-      ['198.51.100.0', 0xffffff00], ['203.0.113.0', 0xffffff00], ['224.0.0.0', 0xf0000000],
-      ['240.0.0.0', 0xf0000000],
-    ].map(([a, m]) => [a.split('.').map(Number).reduce((t, v) => ((t << 8) | v) >>> 0, 0), m]);
-    return ranges.some(([base, mask]) => (x & mask) >>> 0 === base);
+    const x = ipv4ToBigInt(ip);
+    return RESERVED_V4.some(([base, len]) => inPrefix(x, ipv4ToBigInt(base), len, 32));
   }
-  const l = ip.toLowerCase();
-  return (
-    ['::', '::1'].includes(l) ||
-    l.startsWith('fc') || l.startsWith('fd') ||
-    l.startsWith('fe8') || l.startsWith('fe9') || l.startsWith('fea') || l.startsWith('feb') ||
-    l.startsWith('2001:db8') || l.startsWith('ff')
-  );
+  const x = ipv6ToBigInt(ip);
+  if (RESERVED_V6.some(([base, len]) => inPrefix(x, ipv6ToBigInt(base), len, 128))) return true;
+  if (V4_EMBEDDING_V6.some(([base, len]) => inPrefix(x, ipv6ToBigInt(base), len, 128))) {
+    return isReservedIP(4, bigIntToIpv4(x & 0xffffffffn));
+  }
+  return false;
 }
 
 function ipv4ToBigInt(ip) {

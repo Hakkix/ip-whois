@@ -36,6 +36,7 @@ const els = {
 };
 
 const state = { selfIp: null };
+let selfIpDetectionStarted = false;
 let lastReport = null;
 let investigationToken = 0;
 
@@ -56,6 +57,12 @@ function updateHeaderCompact() {
 }
 
 function showLanding() {
+  // Self-IP detection sends the visitor's IP to a GeoIP provider, so it only
+  // runs once the landing view is actually shown (not on a direct ?q= link).
+  if (!selfIpDetectionStarted) {
+    selfIpDetectionStarted = true;
+    runSelfIpDetection(false);
+  }
   els.landingView.hidden = false;
   els.chooserView.hidden = true;
   els.investigationView.hidden = true;
@@ -270,14 +277,14 @@ async function runIpInvestigation({ ip, version, queryType, hostname, forwardAdd
   if (pushUrl) pushUrlState(displayQuery);
 }
 
-function showChooserView(hostname, addresses, displayQuery, pushUrl) {
+function showChooserView(hostname, addresses, forwardAddresses, displayQuery, pushUrl) {
   const token = ++investigationToken;
   showChooser();
   const refs = renderChooser(els.chooserView, addresses, (ip) => {
     if (token !== investigationToken) return;
     const version = ip.includes(':') ? 6 : 4;
     runIpInvestigation({
-      ip, version, queryType: 'hostname', hostname, forwardAddresses: addresses, displayQuery, pushUrl,
+      ip, version, queryType: 'hostname', hostname, forwardAddresses, displayQuery, pushUrl,
     });
   });
   for (const ip of addresses) {
@@ -316,15 +323,20 @@ async function runInvestigationFromRaw(rawInput, opts = {}) {
       renderError(els.investigationContainer, 'Could not resolve this hostname to an IP address.', classified.value);
       return;
     }
-    if (resolved.addresses.length === 1) {
-      const ip = resolved.addresses[0];
+    const publicAddresses = resolved.addresses.filter((a) => !isReservedIP(a.includes(':') ? 6 : 4, a));
+    if (!publicAddresses.length) {
+      renderError(els.investigationContainer, 'This hostname resolves only to reserved/private addresses, which cannot be looked up publicly.', classified.value);
+      return;
+    }
+    if (publicAddresses.length === 1) {
+      const ip = publicAddresses[0];
       await runIpInvestigation({
         ip, version: ip.includes(':') ? 6 : 4, queryType: 'hostname', hostname: classified.value,
         forwardAddresses: resolved.addresses, displayQuery, pushUrl,
       });
       return;
     }
-    showChooserView(classified.value, resolved.addresses, displayQuery, pushUrl);
+    showChooserView(classified.value, publicAddresses, resolved.addresses, displayQuery, pushUrl);
     return;
   }
 
@@ -419,12 +431,14 @@ window.addEventListener('resize', updateHeaderCompact);
   if (!isCoarsePointer) els.input.focus();
 
   refreshRecentLookupsUI();
-  runSelfIpDetection(false);
 
   const initialQuery = new URLSearchParams(location.search).get('q');
   if (initialQuery) {
     els.input.value = initialQuery;
     runInvestigationFromRaw(initialQuery, { pushUrl: false });
+    // An invalid or reserved query is rejected synchronously and leaves the
+    // landing view in place, so it still needs self-IP detection.
+    if (!els.landingView.hidden) showLanding();
   } else {
     showLanding();
   }

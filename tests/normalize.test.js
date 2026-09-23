@@ -76,6 +76,31 @@ describe('input parsing', () => {
     assert.equal(isReservedIP(6, 'fe80::1'), true);
     assert.equal(isReservedIP(6, '2001:4860:4860::8888'), false);
   });
+
+  test('carrier-grade NAT (100.64.0.0/10) is flagged, neighbours are not', () => {
+    assert.equal(isReservedIP(4, '100.64.0.1'), true);
+    assert.equal(isReservedIP(4, '100.127.255.255'), true);
+    assert.equal(isReservedIP(4, '100.63.255.255'), false);
+    assert.equal(isReservedIP(4, '100.128.0.0'), false);
+  });
+
+  test('IPv6 ranges are matched numerically, not by text prefix', () => {
+    assert.equal(isReservedIP(6, '2001:0db8::1'), true);
+    assert.equal(isReservedIP(6, '2001:db8:0:0:0:0:0:1'), true);
+    assert.equal(isReservedIP(6, '0:0:0:0:0:0:0:1'), true);
+    assert.equal(isReservedIP(6, 'fc::1'), false);
+    assert.equal(isReservedIP(6, 'fd12:3456::1'), true);
+    assert.equal(isReservedIP(6, 'febf::1'), true);
+    assert.equal(isReservedIP(6, 'fec0::1'), false);
+  });
+
+  test('IPv4-mapped and NAT64 addresses inherit the embedded IPv4 classification', () => {
+    assert.equal(isReservedIP(6, '::ffff:10.0.0.1'), true);
+    assert.equal(isReservedIP(6, '::ffff:a00:1'), true);
+    assert.equal(isReservedIP(6, '64:ff9b::192.168.1.1'), true);
+    assert.equal(isReservedIP(6, '::ffff:8.8.8.8'), false);
+    assert.equal(isReservedIP(6, '64:ff9b::8.8.8.8'), false);
+  });
 });
 
 describe('PTR name generation', () => {

@@ -5,9 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>IP Intelligence</title>
   <meta name="description" content="Network intelligence for IP addresses and hostnames." />
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,400;14..32,500;14..32,600;14..32,700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="vendor/fonts/fonts.css" />
   <link rel="stylesheet" href="base.css" />
   <link rel="stylesheet" href="style.css" />
   <link rel="stylesheet" href="vendor/leaflet/leaflet.css" />
@@ -60,7 +58,7 @@
       <div id="self-ip-hero" class="self-ip-hero"></div>
       <div id="intelligence-tiles" class="intelligence-tiles"></div>
       <div id="source-status-strip" class="source-status-strip" role="status"></div>
-      <p class="privacy-note">Your IP is detected for this session only and is not stored.</p>
+      <p class="privacy-note">To detect your IP, your browser sends it to a third-party GeoIP provider (ipinfo.io, with ipwho.is and ipapi.co as fallbacks). This app does not store it.</p>
       <details id="recent-lookups" class="recent-lookups" hidden>
         <summary>Recent lookups</summary>
         <ul id="recent-lookups-list" class="recent-lookups-list"></ul>
@@ -109,7 +107,9 @@
       <section id="about-section-privacy" class="about-section">
         <h3>Privacy</h3>
         <ul>
-          <li>Your public IP is used only to populate the self-IP display.</li>
+          <li>Your public IP is used only to populate the self-IP display. To detect it, your browser calls a third-party GeoIP provider (ipinfo.io, falling back to ipwho.is and ipapi.co), which sees your IP. This lookup is skipped when you open a report link directly.</li>
+          <li>Every lookup is made from your browser, so the RDAP, DNS-over-HTTPS and GeoIP providers you query see your IP address. Reports with a map also load tiles from OpenStreetMap.</li>
+          <li>Fonts are served from this site; no request goes to Google Fonts.</li>
           <li>Session lookup history is kept only for the current browser session (<code>sessionStorage</code>), never persisted.</li>
           <li>No persistent lookup history is stored by this application.</li>
           <li>No browser GPS/geolocation permission is ever requested.</li>
