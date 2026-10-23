@@ -32,9 +32,9 @@ function fullReport() {
 }
 
 describe('buildReport', () => {
-  test('produces a schema_version 2.0 report', () => {
+  test('produces a schema_version 2.1 report', () => {
     const r = fullReport();
-    assert.equal(r.schema_version, '2.0');
+    assert.equal(r.schema_version, '2.1');
     assert.ok(r.generated_at);
   });
 
@@ -58,6 +58,23 @@ describe('buildReport', () => {
   test('ASN prefix defaults to the network CIDR when the provider gave none', () => {
     const r = fullReport();
     assert.equal(r.asn.prefix, r.network.cidrs[0]);
+  });
+
+  test('sources name the provider that answered and when, per data block', () => {
+    const r = buildReport({
+      input: 'example.com', queryType: 'hostname', hostname: 'example.com', forwardAddresses: ['93.184.216.34'],
+      forwardSource: { provider: 'dns.google', retrieved_at: '2026-10-23T00:00:00.000Z' },
+      ip: '93.184.216.34', version: 4, rdap: null,
+      location: { source: 'ipwho.is', latitude: null, longitude: null },
+      asn: { number: 1, display: 'AS1', organization: null, prefix: null, source: 'ipwho.is' },
+      reverse: { hostname: null, source: { provider: 'cloudflare-dns.com', retrieved_at: '2026-10-23T00:00:01.000Z' } },
+      retrievedAt: { geolocation: '2026-10-23T00:00:02.000Z' }, warnings: [],
+    });
+    assert.deepEqual(r.sources.dns.forward, { provider: 'dns.google', retrieved_at: '2026-10-23T00:00:00.000Z' });
+    assert.equal(r.sources.dns.reverse.provider, 'cloudflare-dns.com');
+    assert.deepEqual(r.sources.geolocation, { provider: 'ipwho.is', retrieved_at: '2026-10-23T00:00:02.000Z' });
+    assert.equal(r.sources.asn.provider, 'ipwho.is');
+    assert.match(reportToMarkdown(r), /DNS \(forward\) \| dns\.google — 2026-10-23T00:00:00\.000Z/);
   });
 
   test('PTR absence (null hostname) is not treated as an error', () => {

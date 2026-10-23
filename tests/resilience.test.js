@@ -83,6 +83,7 @@ describe('DNS resolution', () => {
     ]);
     const result = await resolveHostname('ipv6-only.example');
     assert.deepEqual(result.addresses, ['2606:2800:220:1:248:1893:25c8:1946']);
+    assert.equal(result.source.provider, 'cloudflare-dns.com');
   });
 
   test('resolves nothing (empty addresses) when neither A nor AAAA exist — not a thrown error', async () => {
@@ -99,7 +100,8 @@ describe('reverse DNS (PTR)', () => {
   test('NXDOMAIN (Status 3) resolves to { hostname: null }, not an error', async () => {
     mockFetch([[/type=PTR/, () => okJson({ Status: 3, Question: [{ type: 12 }] })]]);
     const result = await reversePTR('203.0.113.5', 4);
-    assert.deepEqual(result, { hostname: null });
+    assert.equal(result.hostname, null);
+    assert.equal(result.source.provider, 'cloudflare-dns.com');
   });
 
   test('a PTR record is parsed and its trailing dot stripped', async () => {
@@ -109,12 +111,23 @@ describe('reverse DNS (PTR)', () => {
       Answer: [{ type: 12, data: 'dns.google.' }],
     })]]);
     const result = await reversePTR('8.8.8.8', 4);
-    assert.deepEqual(result, { hostname: 'dns.google' });
+    assert.equal(result.hostname, 'dns.google');
+    assert.equal(result.source.provider, 'cloudflare-dns.com');
+    assert.match(result.source.retrieved_at, /^\d{4}-\d\d-\d\dT/);
   });
 
   test('every DoH provider being unreachable resolves to { hostname: null }, never throws', async () => {
     mockFetch([[/./, () => { throw new Error('network down'); }]]);
     const result = await reversePTR('8.8.8.8', 4);
-    assert.deepEqual(result, { hostname: null });
+    assert.deepEqual(result, { hostname: null, source: null });
+  });
+
+  test('falls back to the second DoH provider and reports which one answered', async () => {
+    mockFetch([
+      [/cloudflare-dns\.com/, () => { throw new Error('down'); }],
+      [/dns\.google/, () => okJson({ Status: 0, Question: [{ type: 12 }], Answer: [{ type: 12, data: 'dns.google.' }] })],
+    ]);
+    const result = await reversePTR('8.8.8.8', 4);
+    assert.equal(result.source.provider, 'dns.google');
   });
 });

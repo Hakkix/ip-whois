@@ -135,6 +135,7 @@ export function normalizeAsn(raw, providerId) {
     organization: organization || null,
     country_code: null,
     prefix: null,
+    source: providerId,
   };
 }
 

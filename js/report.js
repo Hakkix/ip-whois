@@ -3,7 +3,7 @@
 // none of them know about RDAP, DNS, or geolocation provider shapes.
 import { isoNow, has } from './utils.js';
 
-const SCHEMA_VERSION = '2.0';
+const SCHEMA_VERSION = '2.1';
 
 const emptyNetwork = () => ({
   name: null, handle: null, type: null, start_address: null, end_address: null,
@@ -15,7 +15,7 @@ const emptyContacts = () => ({ abuse: [], technical: [], administrative: [], reg
 export function buildReport({
   input, queryType, hostname, forwardAddresses = [],
   ip, version, rdap = null, location = null, asn = null, reverse = null,
-  warnings = [],
+  forwardSource = null, retrievedAt = {}, warnings = [],
 }) {
   const network = rdap ? rdap.network : emptyNetwork();
   let asnFinal = asn;
@@ -45,10 +45,12 @@ export function buildReport({
     contacts: rdap ? rdap.contacts : emptyContacts(),
     location,
     remarks: rdap ? rdap.remarks : [],
+    // Each source names the provider that actually answered and when.
     sources: {
-      rdap: rdap ? { provider: rdap.rir.name, url: rdap.rir.rdap_url } : null,
-      dns: { provider: 'Cloudflare / Google DNS-over-HTTPS' },
-      geolocation: location ? { provider: location.source } : null,
+      rdap: rdap ? { provider: rdap.rir.name, url: rdap.rir.rdap_url, retrieved_at: retrievedAt.rdap ?? null } : null,
+      dns: { forward: forwardSource, reverse: reverse?.source ?? null },
+      geolocation: location ? { provider: location.source, retrieved_at: retrievedAt.geolocation ?? null } : null,
+      asn: asn?.source ? { provider: asn.source, retrieved_at: retrievedAt.geolocation ?? null } : null,
     },
     warnings,
   };
@@ -101,7 +103,7 @@ function networkRows(r) {
 function asnRows(r) {
   return [
     ['ASN', r.asn.display], ['Organization', r.asn.organization], ['Prefix', r.asn.prefix],
-    ['Country', r.asn.country_code],
+    ['Country', r.asn.country_code], ['Provider', r.asn.source],
   ];
 }
 
@@ -140,11 +142,15 @@ function contactLines(contacts, formatOne) {
   return lines;
 }
 
+const sourceLabel = (s, extra) => (s ? [s.provider, extra, s.retrieved_at].filter(has).join(' — ') : null);
+
 function sourcesRows(r) {
   return [
-    ['RDAP', r.sources.rdap ? `${r.sources.rdap.provider} — ${r.sources.rdap.url}` : null],
-    ['DNS', r.sources.dns.provider],
-    ['Geolocation', r.sources.geolocation ? r.sources.geolocation.provider : null],
+    ['RDAP', sourceLabel(r.sources.rdap, r.sources.rdap?.url)],
+    ['DNS (forward)', sourceLabel(r.sources.dns.forward)],
+    ['DNS (reverse)', sourceLabel(r.sources.dns.reverse)],
+    ['Geolocation', sourceLabel(r.sources.geolocation)],
+    ['ASN', sourceLabel(r.sources.asn)],
     ['Generated', r.generated_at],
   ];
 }
