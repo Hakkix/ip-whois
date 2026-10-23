@@ -60,6 +60,18 @@ Every format is generated from the same normalized internal report model (schema
 - Queries call the RDAP/DNS/geolocation providers listed above directly from your browser. Those providers see your IP address and the queried IP or hostname, and may log it under their own policies.
 - By default the queried address is written to the page URL (`?q=`), so it can remain in browser history and in shared links. The "Keep searches out of the URL" option under the search box turns this off (the flag is remembered in `localStorage`; queries never are).
 
+## End-to-end tests
+
+Playwright drives the real page against a local static server that sends the same headers as `vercel.json` (so CSP violations fail the suite). All third-party endpoints are mocked with the fixtures in `tests/fixtures`; no real network access is used.
+
+```
+npm install
+npx playwright install chromium   # once
+npm run test:e2e
+```
+
+`npm test` still runs only the Node unit tests.
+
 ## Architecture
 
 Static site, no build step, no frontend framework:
