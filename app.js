@@ -329,6 +329,15 @@ async function runInvestigationFromRaw(rawInput, opts = {}) {
       renderError(els.investigationContainer, 'Could not resolve this hostname to an IP address.', classified.value);
       return;
     }
+    // DNS answers are untrusted input: drop malformed and reserved addresses.
+    resolved.addresses = resolved.addresses.filter((a) => {
+      const c = classifyInput(a);
+      return c && c.type !== 'hostname' && !isReservedIP(c.type === 'ipv4' ? 4 : 6, c.value);
+    });
+    if (!resolved.addresses.length) {
+      renderError(els.investigationContainer, 'This hostname only resolves to reserved/private addresses, which cannot be looked up publicly.', classified.value);
+      return;
+    }
     if (resolved.addresses.length === 1) {
       const ip = resolved.addresses[0];
       await runIpInvestigation({
