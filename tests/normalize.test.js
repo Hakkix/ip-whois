@@ -75,6 +75,18 @@ describe('input parsing', () => {
     assert.equal(isReservedIP(6, '::1'), true);
     assert.equal(isReservedIP(6, 'fe80::1'), true);
     assert.equal(isReservedIP(6, '2001:4860:4860::8888'), false);
+    // alternate notations must classify the same as the canonical form
+    assert.equal(isReservedIP(6, '2001:0db8::1'), true);
+    assert.equal(isReservedIP(6, '2001:db8:0:0:0:0:0:1'), true);
+    assert.equal(isReservedIP(6, '2001:db80::1'), false);
+    assert.equal(isReservedIP(6, 'fe80::1'), true);
+    assert.equal(isReservedIP(6, 'febf::1'), true);
+    assert.equal(isReservedIP(6, 'fec0::1'), false);
+    assert.equal(isReservedIP(6, 'fd00::1'), true);
+    assert.equal(isReservedIP(6, 'ff02::1'), true);
+    assert.equal(isReservedIP(6, '0:0:0:0:0:0:0:1'), true);
+    assert.equal(isReservedIP(6, '::ffff:10.0.0.1'), true);
+    assert.equal(isReservedIP(6, '::ffff:8.8.8.8'), false);
   });
 });
 

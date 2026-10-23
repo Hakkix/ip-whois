@@ -144,14 +144,15 @@ export function isReservedIP(version, ip) {
     ].map(([a, m]) => [a.split('.').map(Number).reduce((t, v) => ((t << 8) | v) >>> 0, 0), m]);
     return ranges.some(([base, mask]) => (x & mask) >>> 0 === base);
   }
-  const l = ip.toLowerCase();
-  return (
-    ['::', '::1'].includes(l) ||
-    l.startsWith('fc') || l.startsWith('fd') ||
-    l.startsWith('fe8') || l.startsWith('fe9') || l.startsWith('fea') || l.startsWith('feb') ||
-    l.startsWith('2001:db8') || l.startsWith('ff')
-  );
+  const x = ipv6ToBigInt(ip);
+  // IPv4-mapped addresses (::ffff:a.b.c.d) inherit the IPv4 verdict.
+  if (x >> 32n === 0xffffn) return isReservedIP(4, bigIntToIpv4(x & 0xffffffffn));
+  return IPV6_RESERVED.some(([base, prefix]) => x >> BigInt(128 - prefix) === base >> BigInt(128 - prefix));
 }
+
+const IPV6_RESERVED = [
+  ['::', 128], ['::1', 128], ['fc00::', 7], ['fe80::', 10], ['2001:db8::', 32], ['ff00::', 8],
+].map(([a, p]) => [ipv6ToBigInt(a), p]);
 
 function ipv4ToBigInt(ip) {
   return ip.split('.').map(Number).reduce((acc, o) => (acc << 8n) | BigInt(o), 0n);
