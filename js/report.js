@@ -18,10 +18,6 @@ export function buildReport({
   warnings = [],
 }) {
   const network = rdap ? rdap.network : emptyNetwork();
-  let asnFinal = asn;
-  if (asnFinal && network.cidrs.length && !asnFinal.prefix) {
-    asnFinal = { ...asnFinal, prefix: network.cidrs[0] };
-  }
 
   return {
     schema_version: SCHEMA_VERSION,
@@ -38,7 +34,7 @@ export function buildReport({
       reverse: { hostname: reverse ? reverse.hostname : null },
     },
     network,
-    asn: asnFinal || null,
+    asn: asn || null,
     rir: rdap ? { name: rdap.rir.name, rdap_url: rdap.rir.rdap_url } : { name: null, rdap_url: null },
     registration: rdap ? rdap.registration : emptyRegistration(),
     registrant: rdap ? rdap.registrant : { name: null, country_code: null },
