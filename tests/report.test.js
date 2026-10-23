@@ -32,9 +32,9 @@ function fullReport() {
 }
 
 describe('buildReport', () => {
-  test('produces a schema_version 2.1 report', () => {
+  test('produces a schema_version 2.2 report', () => {
     const r = fullReport();
-    assert.equal(r.schema_version, '2.1');
+    assert.equal(r.schema_version, '2.2');
     assert.ok(r.generated_at);
   });
 

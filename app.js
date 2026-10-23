@@ -2,8 +2,9 @@ import { classifyInput, isReservedIP, isoNow } from './js/utils.js';
 import { resolveHostname, reversePTR } from './js/dns.js';
 import { fetchRdap, normalizeRdap } from './js/rdap.js';
 import { fetchGeo, fetchSelfGeo, normalizeGeoResponse, normalizeAsn } from './js/geo.js';
-import { buildReport, reportToJSON, reportToMarkdown, reportToText } from './js/report.js';
-import { renderReport, renderLoading, renderError } from './js/render.js';
+import { buildReport, withTls, reportToJSON, reportToMarkdown, reportToText } from './js/report.js';
+import { fetchTls, tlsPending } from './js/tls.js';
+import { renderReport, renderTlsUpdate, renderLoading, renderError } from './js/render.js';
 import { createSelfIpView, renderRecentLookups } from './js/landing.js';
 import { renderChooser, updateChooserCandidate } from './js/chooser.js';
 import { addRecentLookup, getRecentLookups } from './js/history.js';
@@ -40,6 +41,7 @@ const els = {
 const state = { selfIp: null };
 let lastReport = null;
 let investigationToken = 0;
+let tlsAbort = null;
 
 initToasts(els.toastRegion);
 const about = initAboutModal(els.aboutModal);
@@ -243,6 +245,19 @@ function refreshRecentLookupsUI() {
 async function runIpInvestigation({ ip, version, queryType, hostname, forwardAddresses, forwardSource = null, displayQuery, pushUrl }) {
   const token = ++investigationToken;
   showInvestigation();
+  tlsAbort?.abort();
+  tlsAbort = null;
+  // Hostname lookups only: inspect the certificate of the *selected* IP, in
+  // parallel with RDAP/GeoIP/PTR. It never gates the rest of the report.
+  let tlsResult = null;
+  let tlsRequest = null;
+  if (queryType === 'hostname' && hostname) {
+    tlsAbort = new AbortController();
+    tlsRequest = fetchTls(hostname, ip, { signal: tlsAbort.signal }).then((result) => {
+      tlsResult = result;
+      return result;
+    });
+  }
   renderLoading(els.investigationContainer, `Looking up registration, network location, and reverse DNS for ${ip}…`);
 
   const [rdapSettled, geoSettled, ptrSettled] = await Promise.allSettled([
@@ -274,10 +289,19 @@ async function runIpInvestigation({ ip, version, queryType, hostname, forwardAdd
   const report = buildReport({
     input: displayQuery, queryType, hostname, forwardAddresses, forwardSource,
     ip, version, rdap: rdapNormalized, location, asn, reverse, retrievedAt, warnings,
+    tls: tlsRequest ? (tlsResult ?? tlsPending(hostname, ip)) : null,
   });
 
   lastReport = report;
   renderReport(els.investigationContainer, report);
+  if (tlsRequest && !tlsResult) {
+    tlsRequest.then((result) => {
+      // A newer search owns the report now; drop this late result.
+      if (token !== investigationToken || !lastReport) return;
+      lastReport = withTls(lastReport, result);
+      renderTlsUpdate(els.investigationContainer, lastReport);
+    });
+  }
   els.exportBtn.hidden = false;
   updateHeaderCompact();
   addRecentLookup({ query: displayQuery });

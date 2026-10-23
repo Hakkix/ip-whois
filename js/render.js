@@ -4,6 +4,7 @@
 // never become markup or execute script. Links are only ever built from
 // URLs this app constructs itself or that pass `safeUrl()`.
 import { el, icon, ICONS, copyButton, safeLink, has } from './domkit.js';
+import { tlsTone, tlsVerdict, TRUST_LABELS, DATE_LABELS, ROLE_LABELS, hostnameMatchLabel, publicKeyLabel } from './tls.js';
 
 function kvRows(rows) {
   const wrap = el('div', { className: 'kv' });
@@ -107,7 +108,7 @@ function sourceAvailabilityRow(r) {
 
 function sectionNav(sectionIds) {
   const nav = el('nav', { className: 'section-nav', attrs: { 'aria-label': 'Report sections' } });
-  const labels = { summary: 'Summary', network: 'Network', asn: 'ASN', geo: 'Geo', dns: 'DNS', registration: 'Registration', sources: 'Sources' };
+  const labels = { summary: 'Summary', network: 'Network', asn: 'ASN', geo: 'Geo', dns: 'DNS', tls: 'TLS', registration: 'Registration', sources: 'Sources' };
   for (const id of sectionIds) {
     nav.appendChild(el('button', { className: 'section-nav-item', text: labels[id] || id, attrs: { type: 'button', 'data-nav-target': id } }));
   }
@@ -146,6 +147,126 @@ function registrationCard(r) {
     ['Status', r.network.status.join(', ') || null],
     ['Parent network', r.network.parent_handle],
   ]);
+}
+
+// ---- TLS certificate ----
+
+const TLS_TONE_ICONS = {
+  valid: ICONS.check,
+  warning: '<path d="M12 9v4M12 17h.01"/><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z"/>',
+  invalid: '<path d="M18 6 6 18M6 6l12 12"/>',
+  unknown: '<circle cx="12" cy="12" r="9"/><path d="M9.1 9a3 3 0 0 1 5.8 1c0 2-3 2.5-3 4.5M12 17.5h.01"/>',
+  unavailable: '<circle cx="12" cy="12" r="9"/><path d="M8 12h8"/>',
+  pending: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
+};
+const ICONS_TLS = '<rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/>';
+
+function tlsStatusBanner(t) {
+  const tone = tlsTone(t);
+  const detail = t.error_code && t.status !== 'ok' ? (t.error_message || t.error_code) : null;
+  return el('div', { className: `tls-status tls-${tone}`, attrs: { role: 'status', 'aria-live': 'polite' } }, [
+    icon(TLS_TONE_ICONS[tone], 16),
+    el('div', {}, [
+      el('strong', { className: 'tls-verdict', text: tlsVerdict(t) }),
+      detail ? el('p', { className: 'tls-detail', text: detail }) : null,
+    ]),
+  ]);
+}
+
+function tlsSansList(sans) {
+  if (!sans.length) return null;
+  const LIMIT = 8;
+  const mk = (list) => el('ul', { className: 'tls-sans mono' }, list.map((s) => el('li', { text: s })));
+  const wrap = el('div', { className: 'tls-san-block' }, [el('h5', { text: `Subject Alternative Names (${sans.length})` }), mk(sans.slice(0, LIMIT))]);
+  if (sans.length > LIMIT) {
+    const more = el('details', { className: 'tls-more' }, [el('summary', { text: `Show ${sans.length - LIMIT} more` }), mk(sans.slice(LIMIT))]);
+    wrap.appendChild(more);
+  }
+  return wrap;
+}
+
+function tlsChainSection(t) {
+  if (!t.chain.length) return null;
+  const details = el('details', { className: 'collapsible tls-chain', attrs: { id: 'tls-chain' } });
+  details.appendChild(el('summary', { text: `Certificate chain (${t.chain.length})` }));
+  const validated = t.chain_summary?.validated;
+  details.appendChild(el('p', { className: 'disclaimer', text: validated === true
+    ? 'The chain validates against the inspection server’s trusted roots. A root shown here may come from that trust store rather than from the server.'
+    : 'The chain could not be validated against a trusted root. Certificate counts do not imply completeness.' }));
+  const list = el('ol', { className: 'tls-chain-list' });
+  for (const e of t.chain) {
+    const rows = kvRows([
+      ['Subject', e.subject], ['Issuer', e.issuer],
+      ['Valid from', e.valid_from], ['Valid until', e.valid_to],
+      ['SHA-256', e.fingerprint_sha256],
+    ]);
+    const label = `${ROLE_LABELS[e.role]}${e.presented === null ? ' — not confirmed as sent by the server' : ''}`;
+    list.appendChild(el('li', {}, [el('strong', { text: label }), rows]));
+  }
+  details.appendChild(list);
+  return details;
+}
+
+function tlsCard(r) {
+  const t = r.tls;
+  const heading = el('h3', { className: 'section-title' }, [icon(ICONS_TLS, 16), el('span', { text: 'TLS certificate' })]);
+  const c = el('article', { className: 'card', attrs: { id: 'section-tls' } }, [heading]);
+  if (!t) {
+    c.appendChild(el('p', { className: 'disclaimer', text: 'TLS certificates are issued to server names, and a server chooses which certificate to present based on the name the client requests (SNI). An IP-only lookup has no name, so no certificate lookup was attempted. Search a hostname to inspect its certificate.' }));
+    return c;
+  }
+  c.setAttribute('aria-busy', String(t.status === 'pending'));
+  c.appendChild(tlsStatusBanner(t));
+  if (t.status === 'pending') return c;
+  const cert = t.certificate;
+  const conn = t.connection;
+  const kv = kvRows([
+    ['Subject', cert?.subject], ['Issuer', cert?.issuer],
+    ['Valid from', cert?.valid_from], ['Valid until', cert?.valid_to],
+    ['Days remaining', has(cert?.days_remaining) ? cert.days_remaining : null],
+    ['Validity dates', cert ? DATE_LABELS[cert.date_status] : null],
+    ['Hostname check', conn ? hostnameMatchLabel(conn.hostname_match) : null],
+    ['Trust', conn ? `${TRUST_LABELS[conn.trust_status]}${conn.trust_detail ? ` (${conn.trust_detail})` : ''}` : null],
+    ['Public key', publicKeyLabel(cert?.public_key)],
+    ['Serial number', cert?.serial_number],
+    ['TLS protocol', conn?.protocol], ['Cipher suite', conn?.cipher],
+    ['SNI hostname', t.hostname],
+    ['Connected to', has(t.connected_ip) ? `${t.connected_ip.includes(':') ? `[${t.connected_ip}]` : t.connected_ip}:${t.port ?? 443}` : null],
+    ['Observed', t.observed_at],
+  ]);
+  if (kv) c.appendChild(kv);
+  if (cert?.fingerprint_sha256) {
+    c.appendChild(el('div', { className: 'kv-coords tls-fingerprint' }, [
+      el('span', { className: 'k', text: 'SHA-256' }),
+      el('span', { className: 'mono tls-fp', text: cert.fingerprint_sha256 }),
+      copyButton(cert.fingerprint_sha256, '', 'Copy SHA-256 fingerprint'),
+    ]));
+  }
+  if (cert) { const sans = tlsSansList(cert.sans); if (sans) c.appendChild(sans); }
+  const chain = tlsChainSection(t);
+  if (chain) c.appendChild(chain);
+  return c;
+}
+
+// In-place refresh when a late TLS result arrives: only the TLS card and the
+// Data sources card are replaced, so scroll position, focus elsewhere and
+// expanded panels in the rest of the report are untouched.
+export function renderTlsUpdate(container, report) {
+  const swap = (id, next) => {
+    const current = container.querySelector(`#${id}`);
+    if (current && next) {
+      const open = Array.from(current.querySelectorAll('details')).map((d) => d.open);
+      const hadFocusInside = current.contains(document.activeElement);
+      current.replaceWith(next);
+      next.querySelectorAll('details').forEach((d, i) => { if (open[i]) d.open = true; });
+      if (hadFocusInside) {
+        next.setAttribute('tabindex', '-1');
+        next.focus({ preventScroll: true });
+      }
+    }
+  };
+  swap('section-tls', tlsCard(report));
+  swap('section-sources', sourcesCard(report));
 }
 
 function requestMapRender(container, lat, lon) {
@@ -249,6 +370,7 @@ function sourcesCard(r) {
     ['DNS (reverse)', sourceLabel(r.sources.dns.reverse)],
     ['Geolocation', sourceLabel(r.sources.geolocation)],
     ['ASN', sourceLabel(r.sources.asn)],
+    ['TLS certificate', sourceLabel(r.sources.tls)],
     ['Generated', r.generated_at],
   ]);
   const heading = el('h3', { className: 'section-title' }, [icon(ICONS_SOURCES, 16), el('span', { text: 'Data sources' })]);
@@ -283,10 +405,11 @@ export function renderReport(container, report) {
     asn: asnCard(report),
     geo: geoCard(report),
     dns: dnsCard(report),
+    tls: tlsCard(report),
     registration: registrationCard(report),
   };
   const sources = sourcesCard(report);
-  const order = ['summary', 'network', 'asn', 'geo', 'dns', 'registration'];
+  const order = ['summary', 'network', 'asn', 'geo', 'dns', 'tls', 'registration'];
   const sectionIds = ['summary', ...order.filter((id) => id !== 'summary' && cards[id])];
   if (sources) sectionIds.push('sources');
 
