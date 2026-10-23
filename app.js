@@ -1,4 +1,4 @@
-import { classifyInput, isReservedIP } from './js/utils.js';
+import { classifyInput, isReservedIP, isoNow } from './js/utils.js';
 import { resolveHostname, reversePTR } from './js/dns.js';
 import { fetchRdap, normalizeRdap } from './js/rdap.js';
 import { fetchGeo, fetchSelfGeo, normalizeGeoResponse, normalizeAsn } from './js/geo.js';
@@ -227,7 +227,7 @@ function refreshRecentLookupsUI() {
 
 // ---- core investigation pipeline ----
 
-async function runIpInvestigation({ ip, version, queryType, hostname, forwardAddresses, displayQuery, pushUrl }) {
+async function runIpInvestigation({ ip, version, queryType, hostname, forwardAddresses, forwardSource = null, displayQuery, pushUrl }) {
   const token = ++investigationToken;
   showInvestigation();
   renderLoading(els.investigationContainer, `Looking up registration, network location, and reverse DNS for ${ip}…`);
@@ -239,6 +239,8 @@ async function runIpInvestigation({ ip, version, queryType, hostname, forwardAdd
   ]);
   if (token !== investigationToken) return;
 
+  const now = isoNow();
+  const retrievedAt = { rdap: now, geolocation: now };
   const warnings = [];
   const rdapNormalized = rdapSettled.status === 'fulfilled' ? rdapSettled.value : null;
   if (rdapSettled.status !== 'fulfilled') {
@@ -257,8 +259,8 @@ async function runIpInvestigation({ ip, version, queryType, hostname, forwardAdd
   const reverse = ptrSettled.status === 'fulfilled' ? ptrSettled.value : { hostname: null };
 
   const report = buildReport({
-    input: displayQuery, queryType, hostname, forwardAddresses,
-    ip, version, rdap: rdapNormalized, location, asn, reverse, warnings,
+    input: displayQuery, queryType, hostname, forwardAddresses, forwardSource,
+    ip, version, rdap: rdapNormalized, location, asn, reverse, retrievedAt, warnings,
   });
 
   lastReport = report;
@@ -270,14 +272,14 @@ async function runIpInvestigation({ ip, version, queryType, hostname, forwardAdd
   if (pushUrl) pushUrlState(displayQuery);
 }
 
-function showChooserView(hostname, addresses, displayQuery, pushUrl) {
+function showChooserView(hostname, addresses, forwardSource, displayQuery, pushUrl) {
   const token = ++investigationToken;
   showChooser();
   const refs = renderChooser(els.chooserView, addresses, (ip) => {
     if (token !== investigationToken) return;
     const version = ip.includes(':') ? 6 : 4;
     runIpInvestigation({
-      ip, version, queryType: 'hostname', hostname, forwardAddresses: addresses, displayQuery, pushUrl,
+      ip, version, queryType: 'hostname', hostname, forwardAddresses: addresses, forwardSource, displayQuery, pushUrl,
     });
   });
   for (const ip of addresses) {
@@ -320,11 +322,11 @@ async function runInvestigationFromRaw(rawInput, opts = {}) {
       const ip = resolved.addresses[0];
       await runIpInvestigation({
         ip, version: ip.includes(':') ? 6 : 4, queryType: 'hostname', hostname: classified.value,
-        forwardAddresses: resolved.addresses, displayQuery, pushUrl,
+        forwardAddresses: resolved.addresses, forwardSource: resolved.source, displayQuery, pushUrl,
       });
       return;
     }
-    showChooserView(classified.value, resolved.addresses, displayQuery, pushUrl);
+    showChooserView(classified.value, resolved.addresses, resolved.source, displayQuery, pushUrl);
     return;
   }
 

@@ -127,7 +127,7 @@ function asnCard(r) {
   if (!r.asn) return null;
   return sectionCard('asn', 'Autonomous system', ICONS_ASN, [
     ['ASN', r.asn.display], ['Organization', r.asn.organization], ['Prefix', r.asn.prefix],
-    ['Country', r.asn.country_code],
+    ['Country', r.asn.country_code], ['Provider', r.asn.source],
   ]);
 }
 
@@ -240,11 +240,15 @@ function remarksSection(r) {
   return details;
 }
 
+const sourceLabel = (s) => (s ? [s.provider, s.retrieved_at].filter(has).join(' — ') : null);
+
 function sourcesCard(r) {
   const kv = kvRows([
-    ['RDAP', r.sources.rdap ? r.sources.rdap.provider : null],
-    ['DNS', r.sources.dns.provider],
-    ['Geolocation', r.sources.geolocation ? r.sources.geolocation.provider : null],
+    ['RDAP', sourceLabel(r.sources.rdap)],
+    ['DNS (forward)', sourceLabel(r.sources.dns.forward)],
+    ['DNS (reverse)', sourceLabel(r.sources.dns.reverse)],
+    ['Geolocation', sourceLabel(r.sources.geolocation)],
+    ['ASN', sourceLabel(r.sources.asn)],
     ['Generated', r.generated_at],
   ]);
   const heading = el('h3', { className: 'section-title' }, [icon(ICONS_SOURCES, 16), el('span', { text: 'Data sources' })]);
