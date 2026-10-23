@@ -96,6 +96,8 @@
 .search-input-wrap input:focus { outline: none; }
 .search-input-wrap input::placeholder { color: var(--text-muted); font-family: var(--font-ui); }
 .kbd-hint { font-size: .75rem; color: var(--text-muted); font-family: var(--font-mono); }
+.search-options { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .3rem 1rem; }
+.url-option { display: inline-flex; align-items: center; gap: .4rem; font-size: .8rem; color: var(--text-muted); cursor: pointer; }
 .validation-message { min-height: 1.2rem; color: var(--error); font-size: .85rem; margin: 0; }
 
 .app-header.is-compact .header-inner { padding: .55rem 0; gap: .4rem; }

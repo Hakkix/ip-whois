@@ -7,6 +7,7 @@ import { renderReport, renderLoading, renderError } from './js/render.js';
 import { createSelfIpView, renderRecentLookups } from './js/landing.js';
 import { renderChooser, updateChooserCandidate } from './js/chooser.js';
 import { addRecentLookup, getRecentLookups } from './js/history.js';
+import { getKeepQueryOutOfUrl, setKeepQueryOutOfUrl } from './js/prefs.js';
 import { initAboutModal } from './js/about.js';
 import { initToasts, showToast, showIpChangeToast } from './js/toast.js';
 
@@ -18,6 +19,7 @@ const els = {
   exportMenu: document.querySelector('#export-menu'),
   aboutBtn: document.querySelector('#about-btn'),
   footerPrivacy: document.querySelector('#footer-privacy'),
+  keepUrlClean: document.querySelector('#keep-url-clean'),
   footerSources: document.querySelector('#footer-sources'),
   form: document.querySelector('#lookup-form'),
   input: document.querySelector('#ip-input'),
@@ -204,7 +206,18 @@ els.myIpBtn.addEventListener('click', goHome);
 
 // ---- URL state ----
 
+function stripQueryFromUrl() {
+  if (new URLSearchParams(location.search).has('q')) history.replaceState({}, '', location.pathname);
+}
+
+els.keepUrlClean.checked = getKeepQueryOutOfUrl();
+els.keepUrlClean.addEventListener('change', () => {
+  setKeepQueryOutOfUrl(els.keepUrlClean.checked);
+  if (els.keepUrlClean.checked) stripQueryFromUrl();
+});
+
 function pushUrlState(query) {
+  if (getKeepQueryOutOfUrl()) return;
   const url = new URL(location.href);
   url.searchParams.set('q', query);
   history.pushState({ q: query }, '', url);
@@ -424,6 +437,7 @@ window.addEventListener('resize', updateHeaderCompact);
   const initialQuery = new URLSearchParams(location.search).get('q');
   if (initialQuery) {
     els.input.value = initialQuery;
+    if (getKeepQueryOutOfUrl()) stripQueryFromUrl();
     runInvestigationFromRaw(initialQuery, { pushUrl: false });
   } else {
     showLanding();

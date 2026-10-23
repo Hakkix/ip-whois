@@ -57,7 +57,8 @@ Every format is generated from the same normalized internal report model (schema
 
 - No browser/device geolocation is requested or used. All geolocation concerns the **queried IP address**, resolved via third-party geolocation APIs.
 - No accounts, no server-side lookup history, no database.
-- Queries call the RDAP/DNS/geolocation providers listed above directly from your browser.
+- Queries call the RDAP/DNS/geolocation providers listed above directly from your browser. Those providers see your IP address and the queried IP or hostname, and may log it under their own policies.
+- By default the queried address is written to the page URL (`?q=`), so it can remain in browser history and in shared links. The "Keep searches out of the URL" option under the search box turns this off (the flag is remembered in `localStorage`; queries never are).
 
 ## Architecture
 

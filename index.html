@@ -49,7 +49,10 @@
           <input id="ip-input" type="text" placeholder="Enter IP address or hostname" autocomplete="off" spellcheck="false" />
           <button type="submit" class="btn btn-primary">Investigate</button>
         </div>
-        <span class="kbd-hint" aria-hidden="true">Enter to investigate</span>
+        <div class="search-options">
+          <span class="kbd-hint" aria-hidden="true">Enter to investigate</span>
+          <label class="url-option"><input type="checkbox" id="keep-url-clean" /> Keep searches out of the URL</label>
+        </div>
       </form>
       <p id="validation-message" class="validation-message" role="alert"></p>
     </div>
@@ -109,9 +112,10 @@
       <section id="about-section-privacy" class="about-section">
         <h3>Privacy</h3>
         <ul>
-          <li>Your public IP is used only to populate the self-IP display.</li>
-          <li>Session lookup history is kept only for the current browser session (<code>sessionStorage</code>), never persisted.</li>
-          <li>No persistent lookup history is stored by this application.</li>
+          <li>Your public IP is detected by a third-party GeoIP service (ipinfo.io, falling back to ipwho.is and ipapi.co) and used to populate the self-IP display.</li>
+          <li>This site has no backend and stores no lookup history. Third parties are different: every query is sent from your browser to external services, which see your IP address and the queried IP or hostname and may log it under their own policies. These are the ARIN RDAP bootstrap and the regional registry that answers (ARIN, RIPE NCC, APNIC, LACNIC, AFRINIC), Cloudflare and Google DNS-over-HTTPS, and the GeoIP services above.</li>
+          <li>By default the queried address is added to the page URL (<code>?q=</code>), so it can stay in your browser history and appear in links you share. Tick “Keep searches out of the URL” to stop this; that choice is remembered in this browser (<code>localStorage</code>) and the query itself is never stored there.</li>
+          <li>Recent lookups are kept only for the current browser session (<code>sessionStorage</code>) and are cleared when the tab closes.</li>
           <li>No browser GPS/geolocation permission is ever requested.</li>
           <li>Queried IP geolocation concerns the investigated IP address, not your physical GPS position.</li>
         </ul>
