@@ -59,6 +59,18 @@ Every format is generated from the same normalized internal report model (schema
 - No accounts, no server-side lookup history, no database.
 - Queries call the RDAP/DNS/geolocation providers listed above directly from your browser.
 
+## End-to-end tests
+
+Playwright drives the real page against a local static server that sends the same headers as `vercel.json` (so CSP violations fail the suite). All third-party endpoints are mocked with the fixtures in `tests/fixtures`; no real network access is used.
+
+```
+npm install
+npx playwright install chromium   # once
+npm run test:e2e
+```
+
+`npm test` still runs only the Node unit tests.
+
 ## Architecture
 
 Static site, no build step, no frontend framework:

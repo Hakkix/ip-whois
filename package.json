@@ -5,6 +5,10 @@
   "description": "Lightweight browser-based IP intelligence tool (RDAP, DNS, ASN, geolocation).",
   "type": "module",
   "scripts": {
-    "test": "node --test"
+    "test": "node --test",
+    "test:e2e": "playwright test"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.56.1"
   }
 }
