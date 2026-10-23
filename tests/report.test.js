@@ -55,9 +55,10 @@ describe('buildReport', () => {
     assert.doesNotMatch(json, /"N\/A"|"unknown"|"-"/);
   });
 
-  test('ASN prefix defaults to the network CIDR when the provider gave none', () => {
+  test('ASN prefix stays null when the provider gave none; the RDAP CIDR is not a BGP prefix', () => {
     const r = fullReport();
-    assert.equal(r.asn.prefix, r.network.cidrs[0]);
+    assert.equal(r.asn.prefix, null);
+    assert.ok(r.network.cidrs.length > 0);
   });
 
   test('sources name the provider that answered and when, per data block', () => {
