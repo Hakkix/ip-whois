@@ -50,7 +50,7 @@ RDAP is used in preference to legacy WHOIS wherever available, per current regis
 Every format is generated from the same normalized internal report model (schema v2.2), so nothing shown in the UI is missing from an export and vice versa. Schema 2.2 adds `dns.forward.status` and `dns.reverse.status` (`ok`, `no_record`, `error` or `not_applicable`): a missing PTR record is `no_record`, while a resolver failure is `error` and raises a warning and a failed DNS indicator.
 
 - **JSON** — the normalized report object, 2-space indented, ISO 8601 timestamps, `null`/`[]` for missing data (never `"N/A"` or `"unknown"` placeholders).
-- **Markdown** — headed sections with tables, suitable for pasting into documentation or a ticket.
+- **Markdown** — headed sections with tables, suitable for pasting into documentation or a ticket. Values from RDAP and other providers are backslash-escaped so they render as literal text and cannot add headings, table cells, links, images, HTML or mentions.
 - **Plain text** — fixed-width sections, readable in a terminal, email, or ticketing system.
 
 ## Privacy

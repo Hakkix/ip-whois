@@ -71,10 +71,33 @@ const dateOnly = (iso) => (has(iso) ? iso.slice(0, 10) : null);
 const coords = (loc) => `${loc.latitude.toFixed(6)}, ${loc.longitude.toFixed(6)}`;
 const osmUrl = (loc) => `https://www.openstreetmap.org/?mlat=${loc.latitude}&mlon=${loc.longitude}#map=12/${loc.latitude}/${loc.longitude}`;
 
+// Escapes an untrusted value for inline Markdown so it renders as literal
+// text: never a heading, list, quote, table cell boundary, link, image, HTML
+// or mention. Apply exactly once, at the point a value is placed into the
+// document (mdTable / contact / remark formatting) — never to text that has
+// already been escaped, and never to the JSON or plain-text exports.
+// Line breaks collapse to a space (a cell or list item is one line); callers
+// that can keep lines (remarks) split on newlines first.
+const MD_SPECIAL = /[\\`*_[\]<>|&~#@]/g;
+export function escapeMarkdown(value) {
+  if (value === null || value === undefined) return '';
+  return String(value)
+    .replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/g, '')
+    .replace(/[\t\r\n\u2028\u2029]+/g, ' ')
+    .trim()
+    .replace(MD_SPECIAL, '\\$&')
+    .replace(/:(?=\/\/)/g, '\\:') // https:// -> no autolink
+    .replace(/\bwww\./gi, (m) => `${m.slice(0, 3)}\\.`)
+    .replace(/^([-+=])(?=\s|$|[-+=])/, '\\$1') // list bullets / setext underlines at line start
+    .replace(/^(\d+)([.)])(?=\s|$)/, '$1\\$2'); // ordered-list markers
+}
+
+const mdLines = (value) => String(value ?? '').split(/\r\n|[\r\n\u2028\u2029]/);
+
 function mdTable(rows) {
   const present = rows.filter(([, v]) => has(v));
   if (!present.length) return [];
-  return ['| Field | Value |', '|---|---|', ...present.map(([k, v]) => `| ${k} | ${v} |`)];
+  return ['| Field | Value |', '|---|---|', ...present.map(([k, v]) => `| ${k} | ${escapeMarkdown(v)} |`)];
 }
 
 function txtRows(rows) {
@@ -176,14 +199,18 @@ export function reportToMarkdown(r) {
   }
   out.push('## DNS', ...mdTable(dnsRows(r)), '');
   if (mdTable(registrationRows(r)).length) out.push('## Registration', ...mdTable(registrationRows(r)), '');
-  const contactsMd = contactLines(r.contacts, (c) => `- ${[c.name, c.organization, c.email, c.phone].filter(has).join(' · ')}`);
+  const contactsMd = contactLines(r.contacts, (c) => `- ${[c.name, c.organization, c.email, c.phone].filter(has).map(escapeMarkdown).join(' · ')}`);
   if (contactsMd.length) out.push('## Contacts', ...contactsMd, '');
   if (r.remarks.length) {
     out.push('## Remarks');
-    for (const rem of r.remarks) out.push(`**${rem.title || 'Remark'}**`, ...rem.description.map((d) => `> ${d}`), '');
+    for (const rem of r.remarks) {
+      out.push(`**${escapeMarkdown(rem.title) || 'Remark'}**`);
+      for (const d of rem.description) for (const line of mdLines(d)) out.push(`> ${escapeMarkdown(line)}`.trimEnd());
+      out.push('');
+    }
   }
   out.push('## Data Sources', ...mdTable(sourcesRows(r)));
-  if (r.warnings.length) out.push('', ...r.warnings.map((w) => `⚠ ${w.component}: ${w.message}`));
+  if (r.warnings.length) out.push('', ...r.warnings.map((w) => `⚠ ${escapeMarkdown(w.component)}: ${escapeMarkdown(w.message)}`));
   return out.join('\n');
 }
 
