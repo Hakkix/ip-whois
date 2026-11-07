@@ -85,6 +85,28 @@ test.describe('partial failures', () => {
   });
 });
 
+test.describe('GeoIP validation', () => {
+  test('out-of-range coordinates never reach the map, but the rest of the location stays', async ({ page }) => {
+    const errors = watchErrors(page);
+    await installMocks(page, {
+      ipinfo: (url) => ({ status: 200, contentType: 'application/json', body: JSON.stringify({ ip: new URL(url).pathname.split('/')[1], city: 'Helsinki', country: 'FI', loc: '999,999', org: 'AS15133 Edgecast Inc.' }) }),
+    });
+    await page.goto('/');
+    await lookup(page, '8.8.8.8');
+    await expect(page.locator('#section-geo')).toContainText('Helsinki');
+    await expect(page.locator('#section-geo .geo-map')).toHaveCount(0);
+    await expect(page.locator('#section-geo .kv-coords')).toHaveCount(0);
+    expect(errors).toEqual([]);
+  });
+
+  test('an empty {} from the first provider falls through to the next', async ({ page }) => {
+    await installMocks(page, { ipinfo: () => ({ status: 200, contentType: 'application/json', body: '{}' }) });
+    await page.goto('/');
+    await lookup(page, '8.8.8.8');
+    await expect(page.locator('#section-sources')).toContainText('ipwho.is');
+  });
+});
+
 test.describe('DNS source status', () => {
   const dohDown = () => ({ status: 503, body: '' });
 
