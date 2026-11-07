@@ -47,10 +47,10 @@ RDAP is used in preference to legacy WHOIS wherever available, per current regis
 
 ## Report formats
 
-Every format is generated from the same normalized internal report model (schema v2), so nothing shown in the UI is missing from an export and vice versa.
+Every format is generated from the same normalized internal report model (schema v2.2), so nothing shown in the UI is missing from an export and vice versa. Schema 2.2 adds `dns.forward.status` and `dns.reverse.status` (`ok`, `no_record`, `error` or `not_applicable`): a missing PTR record is `no_record`, while a resolver failure is `error` and raises a warning and a failed DNS indicator.
 
 - **JSON** — the normalized report object, 2-space indented, ISO 8601 timestamps, `null`/`[]` for missing data (never `"N/A"` or `"unknown"` placeholders).
-- **Markdown** — headed sections with tables, suitable for pasting into documentation or a ticket.
+- **Markdown** — headed sections with tables, suitable for pasting into documentation or a ticket. Values from RDAP and other providers are backslash-escaped so they render as literal text and cannot add headings, table cells, links, images, HTML or mentions.
 - **Plain text** — fixed-width sections, readable in a terminal, email, or ticketing system.
 
 ## Privacy
@@ -58,7 +58,7 @@ Every format is generated from the same normalized internal report model (schema
 - No browser/device geolocation is requested or used. All geolocation concerns the **queried IP address**, resolved via third-party geolocation APIs.
 - No accounts, no server-side lookup history, no database.
 - Queries call the RDAP/DNS/geolocation providers listed above directly from your browser. Those providers see your IP address and the queried IP or hostname, and may log it under their own policies.
-- By default the queried address is written to the page URL (`?q=`), so it can remain in browser history and in shared links. The "Keep searches out of the URL" option under the search box turns this off (the flag is remembered in `localStorage`; queries never are).
+- By default searches are **not** written to the page URL, so they stay out of browser history and shared links. The "Add searches to the URL (shareable link)" option under the search box opts in to `?q=` links (the flag is remembered in `localStorage`; queries never are). Opening a link that already has `?q=` runs that search; unless you opted in, the parameter is then removed from the address bar. If `localStorage` is blocked, the app still works and the default applies on every load. Earlier versions stored a "keep out of URL" flag; it is still honoured (it matches the new default), but an earlier explicit opt-out cannot be recovered and resets to the new default.
 
 ## End-to-end tests
 
@@ -71,6 +71,11 @@ npm run test:e2e
 ```
 
 `npm test` still runs only the Node unit tests.
+
+
+## Live provider smoke test
+
+`npm test` and the pull-request workflow never touch the real providers. A separate workflow, `.github/workflows/live-smoke.yml` (daily and on manual dispatch), runs `npm run test:live` (`live/smoke.mjs`) against the real RDAP, DNS-over-HTTPS and GeoIP services. It checks response *structure* only (never exact ASNs, cities or coordinates), with a 10 s timeout and up to 3 attempts per provider. A changed response format fails the run; an outage or rate limit of one provider is a warning, and the run fails only if every provider in a group (RDAP, DNS, GeoIP) is unreachable. The retry and classification logic is unit-tested without network in `tests/live-probe.test.js`.
 
 ## Architecture
 

@@ -119,7 +119,7 @@ describe('reverse DNS (PTR)', () => {
   test('every DoH provider being unreachable resolves to { hostname: null }, never throws', async () => {
     mockFetch([[/./, () => { throw new Error('network down'); }]]);
     const result = await reversePTR('8.8.8.8', 4);
-    assert.deepEqual(result, { hostname: null, source: null });
+    assert.deepEqual(result, { hostname: null, source: null, status: 'error' });
   });
 
   test('falls back to the second DoH provider and reports which one answered', async () => {

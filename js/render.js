@@ -4,6 +4,7 @@
 // never become markup or execute script. Links are only ever built from
 // URLs this app constructs itself or that pass `safeUrl()`.
 import { el, icon, ICONS, copyButton, safeLink, has } from './domkit.js';
+import { DNS_STATUS_LABEL, dnsSourceOk, hasValidCoords } from './utils.js';
 
 function kvRows(rows) {
   const wrap = el('div', { className: 'kv' });
@@ -89,7 +90,7 @@ function summaryCard(r) {
 function sourceAvailabilityRow(r) {
   const entries = [
     ['RDAP', has(r.network.name) || has(r.rir.name)],
-    ['DNS', true],
+    ['DNS', dnsSourceOk(r.dns)],
     ['GeoIP', Boolean(r.location)],
     ['ASN', Boolean(r.asn)],
   ];
@@ -136,6 +137,8 @@ function dnsCard(r) {
     ['Query hostname', r.query.hostname || null],
     ['Resolved addresses', r.dns.forward.addresses.join(', ') || null],
     ['Reverse DNS (PTR)', r.dns.reverse.hostname],
+    ['Forward lookup', DNS_STATUS_LABEL[r.dns.forward.status] ?? null],
+    ['Reverse lookup', DNS_STATUS_LABEL[r.dns.reverse.status] ?? null],
   ]);
 }
 
@@ -176,7 +179,7 @@ function geoCard(r) {
   const c = el('article', { className: 'card', attrs: { id: 'section-geo' } }, [heading]);
   if (kv) c.appendChild(kv);
 
-  if (has(loc.latitude) && has(loc.longitude)) {
+  if (hasValidCoords(loc)) {
     const coordRow = el('div', { className: 'kv-coords' }, [
       el('span', { className: 'mono', text: coords(loc) }),
       copyButton(coords(loc), '', `Copy coordinates ${coords(loc)}`),

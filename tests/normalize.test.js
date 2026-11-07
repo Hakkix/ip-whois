@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 
 import {
-  classifyInput, ptrNameForIPv4, ptrNameForIPv6, expandIPv6, rangeToCidrs, isReservedIP,
+  classifyInput, validIPv6, ptrNameForIPv4, ptrNameForIPv6, expandIPv6, rangeToCidrs, isReservedIP,
 } from '../js/utils.js';
 import { normalizeGeoResponse, normalizeAsn } from '../js/geo.js';
 import { normalizeRdap, detectRir } from '../js/rdap.js';
@@ -87,6 +87,47 @@ describe('input parsing', () => {
     assert.equal(isReservedIP(6, '0:0:0:0:0:0:0:1'), true);
     assert.equal(isReservedIP(6, '::ffff:10.0.0.1'), true);
     assert.equal(isReservedIP(6, '::ffff:8.8.8.8'), false);
+  });
+});
+
+describe('strict IPv6 validation', () => {
+  const valid = ['::', '::1', '2001:db8::1', '2001:db8:0:0:0:0:0:1', '::ffff:192.0.2.1', '2001:db8::192.0.2.1',
+    '1:2:3:4:5:6:7::', '::2:3:4:5:6:7:8', '1:2:3:4:5:6:1.2.3.4', 'ABCD:EF01::1'];
+  const invalid = ['2001:::db8', '2001:db8:::1', '1:2:3:4:5:6:7:8:9', '1:2:3:4:5:6:7', '1:2:3:4:5:6:7::8',
+    '2001:db8::1::2', '2001:db8::192.0.2.999', '2001:db8:192.0.2.1::', 'fe80::1%en0', '[fe80::1%en0]',
+    ':1:2:3:4:5:6:7', '1:2:3:4:5:6:7:', '1::2:', ':::', ':', '12345::1', '1.2.3.4::', '::1.2.3', '::01.2.3.4',
+    '1:2:3:4:5:6:7:1.2.3.4', '::g', ' ', ''];
+
+  for (const ip of valid) {
+    test(`accepts ${ip}`, () => {
+      assert.equal(validIPv6(ip), true);
+      assert.equal(classifyInput(ip)?.type, 'ipv6');
+      assert.equal(expandIPv6(ip).length, 8);
+      assert.match(ptrNameForIPv6(ip), /^(?:[0-9a-f]\.){32}ip6\.arpa$/);
+    });
+  }
+  for (const ip of invalid) {
+    test(`rejects ${JSON.stringify(ip)}`, () => {
+      assert.equal(validIPv6(ip), false);
+      assert.equal(classifyInput(ip), null);
+      assert.throws(() => expandIPv6(ip), RangeError);
+    });
+  }
+
+  test('bracketed literals are still accepted, and only one pair', () => {
+    assert.equal(classifyInput('[2001:db8::1]').value, '2001:db8::1');
+    assert.equal(classifyInput('[[2001:db8::1]]'), null);
+  });
+
+  test('embedded IPv4 expands consistently with validation', () => {
+    assert.deepEqual(expandIPv6('2001:db8::192.0.2.1'), ['2001', '0db8', '0000', '0000', '0000', '0000', 'c000', '0201']);
+    assert.deepEqual(expandIPv6('::'), Array(8).fill('0000'));
+  });
+
+  test('reserved-address policy still applies to validated input', () => {
+    assert.equal(isReservedIP(6, '::ffff:192.0.2.1'), true);
+    assert.equal(isReservedIP(6, '2001:db8::1'), true);
+    assert.equal(isReservedIP(6, '2606:4700::1111'), false);
   });
 });
 

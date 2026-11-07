@@ -15,11 +15,22 @@ const doh = (url) => {
   return json({ Status: 0, Question: [q], Answer: [] });
 };
 
+// Real GeoIP providers echo the address they were asked about, and the app
+// rejects an answer for a different address. Mirror that: the fixture's `ip`
+// becomes the address in the request path (the self-lookup has none, so it
+// keeps the fixture's own address).
+const echoIp = (name) => (url) => {
+  const body = JSON.parse(fixture(name));
+  const requested = new URL(url).pathname.split('/').filter((p) => p && p !== 'json')[0];
+  if (requested) body.ip = decodeURIComponent(requested);
+  return json(body);
+};
+
 export const defaults = {
   rdap: () => json(fixture('rdap-arin.json')),
-  ipinfo: () => json(fixture('geo-ipinfo.json')),
-  ipwhois: () => json(fixture('geo-ipwhois.json')),
-  ipapi: () => json(fixture('geo-ipapi.json')),
+  ipinfo: echoIp('geo-ipinfo.json'),
+  ipwhois: echoIp('geo-ipwhois.json'),
+  ipapi: echoIp('geo-ipapi.json'),
   doh,
 };
 

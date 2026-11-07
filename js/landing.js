@@ -3,7 +3,7 @@
 // `textContent` (through the shared `el()` helper) — never `innerHTML`.
 import { el, copyButton, has } from './domkit.js';
 
-const STATUS_LABEL = { available: 'Available', loading: 'Loading…', unavailable: 'Unavailable' };
+const STATUS_LABEL = { available: 'Available', loading: 'Loading…', unavailable: 'Unavailable', idle: 'Not checked' };
 
 function statusDot(state) {
   return el('span', { className: `status-dot status-dot--${state}`, attrs: { 'aria-hidden': 'true' } });

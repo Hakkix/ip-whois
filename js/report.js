@@ -1,9 +1,11 @@
 // Builds the normalized v2 report model and renders it to JSON, Markdown,
 // and plain text. Every exporter reads only from the normalized model —
 // none of them know about RDAP, DNS, or geolocation provider shapes.
-import { isoNow, has } from './utils.js';
+import { isoNow, has, DNS_STATUS_LABEL, hasValidCoords } from './utils.js';
 
-const SCHEMA_VERSION = '2.1';
+// 2.2: dns.forward.status and dns.reverse.status added (ok | no_record |
+// error | not_applicable).
+const SCHEMA_VERSION = '2.2';
 
 const emptyNetwork = () => ({
   name: null, handle: null, type: null, start_address: null, end_address: null,
@@ -15,9 +17,14 @@ const emptyContacts = () => ({ abuse: [], technical: [], administrative: [], reg
 export function buildReport({
   input, queryType, hostname, forwardAddresses = [],
   ip, version, rdap = null, location = null, asn = null, reverse = null,
-  forwardSource = null, retrievedAt = {}, warnings = [],
+  forwardSource = null, forwardStatus = null, retrievedAt = {}, warnings = [],
 }) {
   const network = rdap ? rdap.network : emptyNetwork();
+  // A caller that knows the real outcome passes it; otherwise claim only what
+  // the data proves (an address/hostname implies a successful answer).
+  const fwdStatus = queryType !== 'hostname' ? 'not_applicable'
+    : forwardStatus ?? (forwardAddresses.length ? 'ok' : 'not_applicable');
+  const revStatus = reverse?.status ?? (reverse?.hostname ? 'ok' : 'not_applicable');
 
   return {
     schema_version: SCHEMA_VERSION,
@@ -30,8 +37,10 @@ export function buildReport({
     },
     ip: { address: ip, version },
     dns: {
-      forward: queryType === 'hostname' ? { hostname, addresses: forwardAddresses } : { hostname: null, addresses: [] },
-      reverse: { hostname: reverse ? reverse.hostname : null },
+      forward: queryType === 'hostname'
+        ? { hostname, addresses: forwardAddresses, status: fwdStatus }
+        : { hostname: null, addresses: [], status: fwdStatus },
+      reverse: { hostname: reverse ? reverse.hostname : null, status: revStatus },
     },
     network,
     asn: asn || null,
@@ -62,10 +71,33 @@ const dateOnly = (iso) => (has(iso) ? iso.slice(0, 10) : null);
 const coords = (loc) => `${loc.latitude.toFixed(6)}, ${loc.longitude.toFixed(6)}`;
 const osmUrl = (loc) => `https://www.openstreetmap.org/?mlat=${loc.latitude}&mlon=${loc.longitude}#map=12/${loc.latitude}/${loc.longitude}`;
 
+// Escapes an untrusted value for inline Markdown so it renders as literal
+// text: never a heading, list, quote, table cell boundary, link, image, HTML
+// or mention. Apply exactly once, at the point a value is placed into the
+// document (mdTable / contact / remark formatting) — never to text that has
+// already been escaped, and never to the JSON or plain-text exports.
+// Line breaks collapse to a space (a cell or list item is one line); callers
+// that can keep lines (remarks) split on newlines first.
+const MD_SPECIAL = /[\\`*_[\]<>|&~#@]/g;
+export function escapeMarkdown(value) {
+  if (value === null || value === undefined) return '';
+  return String(value)
+    .replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/g, '')
+    .replace(/[\t\r\n\u2028\u2029]+/g, ' ')
+    .trim()
+    .replace(MD_SPECIAL, '\\$&')
+    .replace(/:(?=\/\/)/g, '\\:') // https:// -> no autolink
+    .replace(/\bwww\./gi, (m) => `${m.slice(0, 3)}\\.`)
+    .replace(/^([-+=])(?=\s|$|[-+=])/, '\\$1') // list bullets / setext underlines at line start
+    .replace(/^(\d+)([.)])(?=\s|$)/, '$1\\$2'); // ordered-list markers
+}
+
+const mdLines = (value) => String(value ?? '').split(/\r\n|[\r\n\u2028\u2029]/);
+
 function mdTable(rows) {
   const present = rows.filter(([, v]) => has(v));
   if (!present.length) return [];
-  return ['| Field | Value |', '|---|---|', ...present.map(([k, v]) => `| ${k} | ${v} |`)];
+  return ['| Field | Value |', '|---|---|', ...present.map(([k, v]) => `| ${k} | ${escapeMarkdown(v)} |`)];
 }
 
 function txtRows(rows) {
@@ -108,7 +140,7 @@ function geoRows(r) {
   return [
     ['Country', l.country_code ? `${l.country} (${l.country_code})` : l.country],
     ['Region', l.region], ['City', l.city], ['Postal code', l.postal_code], ['Timezone', l.timezone],
-    ['Coordinates', has(l.latitude) && has(l.longitude) ? coords(l) : null], ['Provider', l.source],
+    ['Coordinates', hasValidCoords(l) ? coords(l) : null], ['Provider', l.source],
   ];
 }
 
@@ -116,6 +148,8 @@ function dnsRows(r) {
   return [
     ['Query hostname', r.query.hostname], ['Resolved addresses', r.dns.forward.addresses.join(', ') || null],
     ['Reverse DNS (PTR)', r.dns.reverse.hostname],
+    ['Forward lookup', DNS_STATUS_LABEL[r.dns.forward.status] ?? null],
+    ['Reverse lookup', DNS_STATUS_LABEL[r.dns.reverse.status] ?? null],
   ];
 }
 
@@ -160,19 +194,23 @@ export function reportToMarkdown(r) {
     out.push('## Geolocation', ...mdTable(geoRows(r)));
     out.push('> IP geolocation is approximate and represents network location,');
     out.push('> not the physical location of a person or device.');
-    if (has(r.location.latitude) && has(r.location.longitude)) out.push('', `[Open in OpenStreetMap](${osmUrl(r.location)})`);
+    if (hasValidCoords(r.location)) out.push('', `[Open in OpenStreetMap](${osmUrl(r.location)})`);
     out.push('');
   }
   out.push('## DNS', ...mdTable(dnsRows(r)), '');
   if (mdTable(registrationRows(r)).length) out.push('## Registration', ...mdTable(registrationRows(r)), '');
-  const contactsMd = contactLines(r.contacts, (c) => `- ${[c.name, c.organization, c.email, c.phone].filter(has).join(' · ')}`);
+  const contactsMd = contactLines(r.contacts, (c) => `- ${[c.name, c.organization, c.email, c.phone].filter(has).map(escapeMarkdown).join(' · ')}`);
   if (contactsMd.length) out.push('## Contacts', ...contactsMd, '');
   if (r.remarks.length) {
     out.push('## Remarks');
-    for (const rem of r.remarks) out.push(`**${rem.title || 'Remark'}**`, ...rem.description.map((d) => `> ${d}`), '');
+    for (const rem of r.remarks) {
+      out.push(`**${escapeMarkdown(rem.title) || 'Remark'}**`);
+      for (const d of rem.description) for (const line of mdLines(d)) out.push(`> ${escapeMarkdown(line)}`.trimEnd());
+      out.push('');
+    }
   }
   out.push('## Data Sources', ...mdTable(sourcesRows(r)));
-  if (r.warnings.length) out.push('', ...r.warnings.map((w) => `⚠ ${w.component}: ${w.message}`));
+  if (r.warnings.length) out.push('', ...r.warnings.map((w) => `⚠ ${escapeMarkdown(w.component)}: ${escapeMarkdown(w.message)}`));
   return out.join('\n');
 }
 

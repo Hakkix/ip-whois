@@ -1,13 +1,13 @@
 import { classifyInput, isReservedIP, isoNow } from './js/utils.js';
 import { resolveHostname, reversePTR } from './js/dns.js';
 import { fetchRdap, normalizeRdap } from './js/rdap.js';
-import { fetchGeo, fetchSelfGeo, normalizeGeoResponse, normalizeAsn } from './js/geo.js';
+import { fetchGeo, fetchSelfGeo, normalizeGeoResponse, normalizeAsn, hasLocationData } from './js/geo.js';
 import { buildReport, reportToJSON, reportToMarkdown, reportToText } from './js/report.js';
 import { renderReport, renderLoading, renderError } from './js/render.js';
 import { createSelfIpView, renderRecentLookups } from './js/landing.js';
 import { renderChooser, updateChooserCandidate } from './js/chooser.js';
 import { addRecentLookup, getRecentLookups } from './js/history.js';
-import { getKeepQueryOutOfUrl, setKeepQueryOutOfUrl } from './js/prefs.js';
+import { getShareQueryInUrl, setShareQueryInUrl } from './js/prefs.js';
 import { initAboutModal } from './js/about.js';
 import { initToasts, showToast, showIpChangeToast } from './js/toast.js';
 
@@ -19,7 +19,7 @@ const els = {
   exportMenu: document.querySelector('#export-menu'),
   aboutBtn: document.querySelector('#about-btn'),
   footerPrivacy: document.querySelector('#footer-privacy'),
-  keepUrlClean: document.querySelector('#keep-url-clean'),
+  shareUrl: document.querySelector('#share-url'),
   footerSources: document.querySelector('#footer-sources'),
   form: document.querySelector('#lookup-form'),
   input: document.querySelector('#ip-input'),
@@ -210,14 +210,14 @@ function stripQueryFromUrl() {
   if (new URLSearchParams(location.search).has('q')) history.replaceState({}, '', location.pathname);
 }
 
-els.keepUrlClean.checked = getKeepQueryOutOfUrl();
-els.keepUrlClean.addEventListener('change', () => {
-  setKeepQueryOutOfUrl(els.keepUrlClean.checked);
-  if (els.keepUrlClean.checked) stripQueryFromUrl();
+els.shareUrl.checked = getShareQueryInUrl();
+els.shareUrl.addEventListener('change', () => {
+  setShareQueryInUrl(els.shareUrl.checked);
+  if (!els.shareUrl.checked) stripQueryFromUrl();
 });
 
 function pushUrlState(query) {
-  if (getKeepQueryOutOfUrl()) return;
+  if (!getShareQueryInUrl()) return;
   const url = new URL(location.href);
   url.searchParams.set('q', query);
   history.pushState({ q: query }, '', url);
@@ -240,7 +240,7 @@ function refreshRecentLookupsUI() {
 
 // ---- core investigation pipeline ----
 
-async function runIpInvestigation({ ip, version, queryType, hostname, forwardAddresses, forwardSource = null, displayQuery, pushUrl }) {
+async function runIpInvestigation({ ip, version, queryType, hostname, forwardAddresses, forwardSource = null, forwardStatus = null, displayQuery, pushUrl }) {
   const token = ++investigationToken;
   showInvestigation();
   renderLoading(els.investigationContainer, `Looking up registration, network location, and reverse DNS for ${ip}…`);
@@ -263,16 +263,21 @@ async function runIpInvestigation({ ip, version, queryType, hostname, forwardAdd
   let location = null;
   let asn = null;
   if (geoSettled.status === 'fulfilled' && geoSettled.value) {
-    location = normalizeGeoResponse(geoSettled.value.raw, geoSettled.value.provider);
+    const normalized = normalizeGeoResponse(geoSettled.value.raw, geoSettled.value.provider);
+    location = hasLocationData(normalized) ? normalized : null; // ASN-only answers carry no location
     asn = normalizeAsn(geoSettled.value.raw, geoSettled.value.provider);
+    if (!location) warnings.push({ component: 'geolocation', message: 'The provider returned no location data for this address.' });
   } else {
     warnings.push({ component: 'geolocation', message: 'Geolocation data is currently unavailable.' });
   }
 
-  const reverse = ptrSettled.status === 'fulfilled' ? ptrSettled.value : { hostname: null };
+  const reverse = ptrSettled.status === 'fulfilled' ? ptrSettled.value : { hostname: null, status: 'error' };
+  if (reverse.status === 'error') {
+    warnings.push({ component: 'dns', message: 'Reverse DNS lookup failed; absence of a PTR record below does not mean none exists.' });
+  }
 
   const report = buildReport({
-    input: displayQuery, queryType, hostname, forwardAddresses, forwardSource,
+    input: displayQuery, queryType, hostname, forwardAddresses, forwardSource, forwardStatus,
     ip, version, rdap: rdapNormalized, location, asn, reverse, retrievedAt, warnings,
   });
 
@@ -285,14 +290,14 @@ async function runIpInvestigation({ ip, version, queryType, hostname, forwardAdd
   if (pushUrl) pushUrlState(displayQuery);
 }
 
-function showChooserView(hostname, addresses, forwardSource, displayQuery, pushUrl) {
+function showChooserView(hostname, addresses, forwardSource, forwardStatus, displayQuery, pushUrl) {
   const token = ++investigationToken;
   showChooser();
   const refs = renderChooser(els.chooserView, addresses, (ip) => {
     if (token !== investigationToken) return;
     const version = ip.includes(':') ? 6 : 4;
     runIpInvestigation({
-      ip, version, queryType: 'hostname', hostname, forwardAddresses: addresses, forwardSource, displayQuery, pushUrl,
+      ip, version, queryType: 'hostname', hostname, forwardAddresses: addresses, forwardSource, forwardStatus, displayQuery, pushUrl,
     });
   });
   for (const ip of addresses) {
@@ -313,6 +318,8 @@ async function runInvestigationFromRaw(rawInput, opts = {}) {
   }
   els.msg.textContent = '';
   const displayQuery = rawInput.trim();
+  // Without opt-in, a new search must not leave an earlier ?q= in the URL.
+  if (pushUrl && !getShareQueryInUrl()) stripQueryFromUrl();
 
   if (classified.type === 'hostname') {
     const token = ++investigationToken;
@@ -328,7 +335,9 @@ async function runInvestigationFromRaw(rawInput, opts = {}) {
     }
     if (token !== investigationToken) return;
     if (!resolved.addresses.length) {
-      renderError(els.investigationContainer, 'Could not resolve this hostname to an IP address.', classified.value);
+      renderError(els.investigationContainer, resolved.status === 'error'
+        ? 'DNS resolution failed. Please try again.'
+        : 'This hostname has no A or AAAA records.', classified.value);
       return;
     }
     // DNS answers are untrusted input: drop malformed and reserved addresses.
@@ -344,11 +353,11 @@ async function runInvestigationFromRaw(rawInput, opts = {}) {
       const ip = resolved.addresses[0];
       await runIpInvestigation({
         ip, version: ip.includes(':') ? 6 : 4, queryType: 'hostname', hostname: classified.value,
-        forwardAddresses: resolved.addresses, forwardSource: resolved.source, displayQuery, pushUrl,
+        forwardAddresses: resolved.addresses, forwardSource: resolved.source, forwardStatus: resolved.status, displayQuery, pushUrl,
       });
       return;
     }
-    showChooserView(classified.value, resolved.addresses, resolved.source, displayQuery, pushUrl);
+    showChooserView(classified.value, resolved.addresses, resolved.source, resolved.status, displayQuery, pushUrl);
     return;
   }
 
@@ -383,7 +392,8 @@ async function runSelfIpDetection(isRefresh = false) {
 
   if (!result) {
     selfView.setStatus('geoip', 'unavailable');
-    selfView.setStatus('dns', 'unavailable');
+    // No address was found, so no DNS lookup was attempted.
+    selfView.setStatus('dns', 'idle');
     if (isRefresh && previousIp) {
       showToast('Refresh failed', { tone: 'error' });
     } else {
@@ -397,7 +407,8 @@ async function runSelfIpDetection(isRefresh = false) {
 
   const { ip, raw, provider } = result;
   const version = ip.includes(':') ? 6 : 4;
-  const location = normalizeGeoResponse(raw, provider);
+  const normalizedLoc = normalizeGeoResponse(raw, provider);
+  const location = hasLocationData(normalizedLoc) ? normalizedLoc : null;
   const asn = normalizeAsn(raw, provider);
 
   selfView.setIp(ip, version);
@@ -408,8 +419,13 @@ async function runSelfIpDetection(isRefresh = false) {
   state.selfIp = { ip, version, asn, location, ptr: null };
 
   const reverse = await reversePTR(ip, version);
-  selfView.setPtr(reverse.hostname, reverse.hostname);
-  selfView.setStatus('dns', 'available');
+  if (reverse.status === 'error') {
+    selfView.setPtrUnavailable();
+    selfView.setStatus('dns', 'unavailable');
+  } else {
+    selfView.setPtr(reverse.hostname, reverse.hostname);
+    selfView.setStatus('dns', 'available');
+  }
   state.selfIp.ptr = reverse.hostname;
 
   if (isRefresh && previousIp && previousIp !== ip) {
@@ -448,7 +464,7 @@ window.addEventListener('resize', updateHeaderCompact);
   const initialQuery = new URLSearchParams(location.search).get('q');
   if (initialQuery) {
     els.input.value = initialQuery;
-    if (getKeepQueryOutOfUrl()) stripQueryFromUrl();
+    if (!getShareQueryInUrl()) stripQueryFromUrl();
     runInvestigationFromRaw(initialQuery, { pushUrl: false });
   } else {
     showLanding();

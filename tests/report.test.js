@@ -32,9 +32,9 @@ function fullReport() {
 }
 
 describe('buildReport', () => {
-  test('produces a schema_version 2.1 report', () => {
+  test('produces a schema_version 2.2 report', () => {
     const r = fullReport();
-    assert.equal(r.schema_version, '2.1');
+    assert.equal(r.schema_version, '2.2');
     assert.ok(r.generated_at);
   });
 
@@ -48,7 +48,7 @@ describe('buildReport', () => {
     assert.equal(r.network.name, null);
     assert.equal(r.location, null);
     assert.equal(r.asn, null);
-    assert.deepEqual(r.dns.reverse, { hostname: null });
+    assert.deepEqual(r.dns.reverse, { hostname: null, status: 'not_applicable' });
     assert.equal(r.warnings.length, 1);
     // never "N/A" / "unknown" / "-" placeholders inside the model
     const json = reportToJSON(r);

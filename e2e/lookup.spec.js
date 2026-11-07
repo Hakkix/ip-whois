@@ -27,7 +27,7 @@ test.describe('IP lookup', () => {
     for (const id of ['network', 'asn', 'geo', 'dns', 'sources']) await expect(page.locator(`#section-${id}`)).toBeVisible();
     await expect(page.locator('#section-summary .summary-ptr')).toContainText('dns.example.net');
     await expect(page.locator('.warnings-banner')).toHaveCount(0);
-    await expect(page).toHaveURL(/[?&]q=8\.8\.8\.8/);
+    expect(new URL(page.url()).searchParams.has('q')).toBe(false);
     expect(errors).toEqual([]);
   });
 
@@ -85,6 +85,64 @@ test.describe('partial failures', () => {
   });
 });
 
+test.describe('GeoIP validation', () => {
+  test('out-of-range coordinates never reach the map, but the rest of the location stays', async ({ page }) => {
+    const errors = watchErrors(page);
+    await installMocks(page, {
+      ipinfo: (url) => ({ status: 200, contentType: 'application/json', body: JSON.stringify({ ip: new URL(url).pathname.split('/')[1], city: 'Helsinki', country: 'FI', loc: '999,999', org: 'AS15133 Edgecast Inc.' }) }),
+    });
+    await page.goto('/');
+    await lookup(page, '8.8.8.8');
+    await expect(page.locator('#section-geo')).toContainText('Helsinki');
+    await expect(page.locator('#section-geo .geo-map')).toHaveCount(0);
+    await expect(page.locator('#section-geo .kv-coords')).toHaveCount(0);
+    expect(errors).toEqual([]);
+  });
+
+  test('an empty {} from the first provider falls through to the next', async ({ page }) => {
+    await installMocks(page, { ipinfo: () => ({ status: 200, contentType: 'application/json', body: '{}' }) });
+    await page.goto('/');
+    await lookup(page, '8.8.8.8');
+    await expect(page.locator('#section-sources')).toContainText('ipwho.is');
+  });
+});
+
+test.describe('DNS source status', () => {
+  const dohDown = () => ({ status: 503, body: '' });
+
+  test('DNS down: the report marks DNS unavailable instead of OK', async ({ page }) => {
+    await installMocks(page, { doh: dohDown });
+    await page.goto('/');
+    await lookup(page, '8.8.8.8');
+    await expect(page.locator('#section-summary')).toBeVisible();
+    await expect(page.locator('.source-item.is-missing', { hasText: 'DNS' })).toBeVisible();
+    await expect(page.locator('.warnings-banner')).toContainText('Reverse DNS');
+  });
+
+  test('a clean NXDOMAIN for the PTR is not a DNS failure', async ({ page }) => {
+    await installMocks(page, { doh: () => ({ status: 200, contentType: 'application/json', body: JSON.stringify({ Status: 3, Question: [{ type: 12 }] }) }) });
+    await page.goto('/');
+    await lookup(page, '8.8.8.8');
+    await expect(page.locator('#section-summary')).toBeVisible();
+    await expect(page.locator('.source-item.is-ok', { hasText: 'DNS' })).toBeVisible();
+    await expect(page.locator('.warnings-banner')).toHaveCount(0);
+  });
+
+  test('landing page: DNS dot turns unavailable when the PTR lookup fails', async ({ page }) => {
+    await installMocks(page, { doh: dohDown });
+    await page.goto('/');
+    await expect(page.locator('.self-ip-address')).toHaveText('93.184.216.34');
+    await expect(page.locator('#source-status-strip .status-item', { hasText: 'DNS' }).locator('.status-dot--unavailable')).toBeVisible();
+    await expect(page.locator('[data-tile=ptr]')).toContainText('unavailable');
+  });
+
+  test('landing page: DNS dot is available when the PTR lookup succeeds', async ({ page }) => {
+    await installMocks(page);
+    await page.goto('/');
+    await expect(page.locator('#source-status-strip .status-item', { hasText: 'DNS' }).locator('.status-dot--available')).toBeVisible();
+  });
+});
+
 test.describe('hostname lookup', () => {
   const twoAddresses = (url) => {
     const type = new URL(url).searchParams.get('type');
@@ -122,5 +180,71 @@ test.describe('export and dialogs', () => {
     await page.keyboard.press('Escape');
     await expect(page.locator('#about-modal')).toBeHidden();
     await expect(page.locator('#about-btn')).toBeFocused();
+  });
+});
+
+test.describe('privacy: searches stay out of the URL by default', () => {
+  test('a fresh user searching does not generate ?q=', async ({ page }) => {
+    await installMocks(page);
+    await page.goto('/');
+    await expect(page.locator('#share-url')).not.toBeChecked();
+    await lookup(page, '8.8.8.8');
+    await expect(page.locator('#section-summary .summary-ip')).toContainText('8.8.8.8');
+    expect(new URL(page.url()).search).toBe('');
+  });
+
+  test('an explicit ?q= link still runs, then is removed from the address bar', async ({ page }) => {
+    await installMocks(page);
+    await page.goto('/?q=8.8.8.8');
+    await expect(page.locator('#section-summary .summary-ip')).toContainText('8.8.8.8');
+    expect(new URL(page.url()).search).toBe('');
+  });
+
+  test('a new search from a shared link does not leave the old ?q= behind', async ({ page }) => {
+    await installMocks(page);
+    await page.goto('/?q=8.8.8.8');
+    await expect(page.locator('#section-summary .summary-ip')).toContainText('8.8.8.8');
+    await page.evaluate(() => history.replaceState({}, '', '/?q=8.8.8.8'));
+    await lookup(page, '1.1.1.1');
+    await expect(page.locator('#section-summary .summary-ip')).toContainText('1.1.1.1');
+    expect(new URL(page.url()).search).toBe('');
+  });
+
+  test('opting in writes ?q=, keeps a shared link, and persists across reloads', async ({ page }) => {
+    await installMocks(page);
+    await page.goto('/');
+    await page.locator('#share-url').check();
+    await lookup(page, '8.8.8.8');
+    await expect(page).toHaveURL(/[?&]q=8\.8\.8\.8/);
+    await page.reload();
+    await expect(page.locator('#section-summary .summary-ip')).toContainText('8.8.8.8');
+    await expect(page.locator('#share-url')).toBeChecked();
+    await expect(page).toHaveURL(/[?&]q=8\.8\.8\.8/);
+  });
+
+  test('unticking the option removes ?q= from the current URL', async ({ page }) => {
+    await installMocks(page);
+    await page.goto('/');
+    await page.locator('#share-url').check();
+    await lookup(page, '8.8.8.8');
+    await expect(page).toHaveURL(/[?&]q=/);
+    await page.locator('#share-url').uncheck();
+    expect(new URL(page.url()).search).toBe('');
+  });
+
+  test('blocked localStorage does not break searching or the toggle', async ({ page }) => {
+    const errors = watchErrors(page);
+    await page.addInitScript(() => {
+      Object.defineProperty(window, 'localStorage', { get() { throw new DOMException('denied', 'SecurityError'); } });
+    });
+    await installMocks(page);
+    await page.goto('/');
+    await lookup(page, '8.8.8.8');
+    await expect(page.locator('#section-summary .summary-ip')).toContainText('8.8.8.8');
+    expect(new URL(page.url()).search).toBe('');
+    await page.locator('#share-url').check();
+    await lookup(page, '1.1.1.1');
+    await expect(page).toHaveURL(/[?&]q=1\.1\.1\.1/);
+    expect(errors).toEqual([]);
   });
 });
