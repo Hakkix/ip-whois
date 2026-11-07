@@ -1,8 +1,8 @@
 // DNS-over-HTTPS resolution: forward A/AAAA lookups and reverse PTR lookups.
 import { fetchWithTimeout, ptrNameFor, isoNow } from './utils.js';
 
-const DOH_PROVIDERS = ['https://cloudflare-dns.com/dns-query', 'https://dns.google/resolve'];
-const RECORD_TYPE = { A: 1, AAAA: 28, PTR: 12 };
+export const DOH_PROVIDERS = ['https://cloudflare-dns.com/dns-query', 'https://dns.google/resolve'];
+export const RECORD_TYPE = { A: 1, AAAA: 28, PTR: 12 };
 
 // Resolves to { json, provider } where provider is the DoH host that actually
 // answered, or null when every provider failed.

@@ -1,0 +1,36 @@
+name: Live provider smoke test
+
+# Checks the real RDAP, DNS-over-HTTPS and GeoIP providers. Deliberately NOT
+# triggered by pull requests or pushes: it depends on third-party uptime, so
+# it must never block a code change. Scheduled runs use the default branch.
+#
+# Failure policy (see live/probe.mjs):
+#   - every probe is retried up to 3 times with backoff and a 10 s timeout
+#   - a response whose *shape* changed fails the run (annotated as an error)
+#   - an outage or rate limit of one provider only raises a warning, because
+#     the app falls back to the next provider; the run fails if every
+#     provider in a group (RDAP, DNS, GeoIP) is unreachable
+#   - values (ASN, city, coordinates) are never compared, only structure
+on:
+  schedule:
+    - cron: '17 5 * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: live-smoke
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  live:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      # No `npm ci`: the smoke test uses only the app's own modules and Node.
+      - run: node live/smoke.mjs

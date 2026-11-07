@@ -72,6 +72,11 @@ npm run test:e2e
 
 `npm test` still runs only the Node unit tests.
 
+
+## Live provider smoke test
+
+`npm test` and the pull-request workflow never touch the real providers. A separate workflow, `.github/workflows/live-smoke.yml` (daily and on manual dispatch), runs `npm run test:live` (`live/smoke.mjs`) against the real RDAP, DNS-over-HTTPS and GeoIP services. It checks response *structure* only (never exact ASNs, cities or coordinates), with a 10 s timeout and up to 3 attempts per provider. A changed response format fails the run; an outage or rate limit of one provider is a warning, and the run fails only if every provider in a group (RDAP, DNS, GeoIP) is unreachable. The retry and classification logic is unit-tested without network in `tests/live-probe.test.js`.
+
 ## Architecture
 
 Static site, no build step, no frontend framework:

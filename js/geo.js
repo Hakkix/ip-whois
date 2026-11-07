@@ -5,7 +5,7 @@ import { fetchWithTimeout, classifyInput, expandIPv6, validCoords } from './util
 
 export const GEO_PROVIDERS = ['ipinfo.io', 'ipwho.is', 'ipapi.co'];
 
-function geoUrl(providerId, ip) {
+export function geoUrl(providerId, ip) {
   // Omitting the IP asks the provider to resolve the caller's own address —
   // used for the landing-page self-IP panel.
   switch (providerId) {
@@ -62,7 +62,7 @@ export function hasLocationData(loc) {
 // A provider answer is accepted only if its shape is sound, it describes the
 // address we asked about, and it carries something useful: an ASN or at least
 // one real location field. A partial answer (ASN but no coordinates) is kept.
-function isUsableGeo(raw, providerId, ip) {
+export function isUsableGeo(raw, providerId, ip) {
   if (isFailedResponse(raw, providerId)) return false;
   if (raw.ip !== undefined && raw.ip !== null) {
     if (typeof raw.ip !== 'string') return false;
