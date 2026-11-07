@@ -7,7 +7,7 @@ import { renderReport, renderLoading, renderError } from './js/render.js';
 import { createSelfIpView, renderRecentLookups } from './js/landing.js';
 import { renderChooser, updateChooserCandidate } from './js/chooser.js';
 import { addRecentLookup, getRecentLookups } from './js/history.js';
-import { getKeepQueryOutOfUrl, setKeepQueryOutOfUrl } from './js/prefs.js';
+import { getShareQueryInUrl, setShareQueryInUrl } from './js/prefs.js';
 import { initAboutModal } from './js/about.js';
 import { initToasts, showToast, showIpChangeToast } from './js/toast.js';
 
@@ -19,7 +19,7 @@ const els = {
   exportMenu: document.querySelector('#export-menu'),
   aboutBtn: document.querySelector('#about-btn'),
   footerPrivacy: document.querySelector('#footer-privacy'),
-  keepUrlClean: document.querySelector('#keep-url-clean'),
+  shareUrl: document.querySelector('#share-url'),
   footerSources: document.querySelector('#footer-sources'),
   form: document.querySelector('#lookup-form'),
   input: document.querySelector('#ip-input'),
@@ -210,14 +210,14 @@ function stripQueryFromUrl() {
   if (new URLSearchParams(location.search).has('q')) history.replaceState({}, '', location.pathname);
 }
 
-els.keepUrlClean.checked = getKeepQueryOutOfUrl();
-els.keepUrlClean.addEventListener('change', () => {
-  setKeepQueryOutOfUrl(els.keepUrlClean.checked);
-  if (els.keepUrlClean.checked) stripQueryFromUrl();
+els.shareUrl.checked = getShareQueryInUrl();
+els.shareUrl.addEventListener('change', () => {
+  setShareQueryInUrl(els.shareUrl.checked);
+  if (!els.shareUrl.checked) stripQueryFromUrl();
 });
 
 function pushUrlState(query) {
-  if (getKeepQueryOutOfUrl()) return;
+  if (!getShareQueryInUrl()) return;
   const url = new URL(location.href);
   url.searchParams.set('q', query);
   history.pushState({ q: query }, '', url);
@@ -313,6 +313,8 @@ async function runInvestigationFromRaw(rawInput, opts = {}) {
   }
   els.msg.textContent = '';
   const displayQuery = rawInput.trim();
+  // Without opt-in, a new search must not leave an earlier ?q= in the URL.
+  if (pushUrl && !getShareQueryInUrl()) stripQueryFromUrl();
 
   if (classified.type === 'hostname') {
     const token = ++investigationToken;
@@ -448,7 +450,7 @@ window.addEventListener('resize', updateHeaderCompact);
   const initialQuery = new URLSearchParams(location.search).get('q');
   if (initialQuery) {
     els.input.value = initialQuery;
-    if (getKeepQueryOutOfUrl()) stripQueryFromUrl();
+    if (!getShareQueryInUrl()) stripQueryFromUrl();
     runInvestigationFromRaw(initialQuery, { pushUrl: false });
   } else {
     showLanding();

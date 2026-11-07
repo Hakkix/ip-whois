@@ -58,7 +58,7 @@ Every format is generated from the same normalized internal report model (schema
 - No browser/device geolocation is requested or used. All geolocation concerns the **queried IP address**, resolved via third-party geolocation APIs.
 - No accounts, no server-side lookup history, no database.
 - Queries call the RDAP/DNS/geolocation providers listed above directly from your browser. Those providers see your IP address and the queried IP or hostname, and may log it under their own policies.
-- By default the queried address is written to the page URL (`?q=`), so it can remain in browser history and in shared links. The "Keep searches out of the URL" option under the search box turns this off (the flag is remembered in `localStorage`; queries never are).
+- By default searches are **not** written to the page URL, so they stay out of browser history and shared links. The "Add searches to the URL (shareable link)" option under the search box opts in to `?q=` links (the flag is remembered in `localStorage`; queries never are). Opening a link that already has `?q=` runs that search; unless you opted in, the parameter is then removed from the address bar. If `localStorage` is blocked, the app still works and the default applies on every load. Earlier versions stored a "keep out of URL" flag; it is still honoured (it matches the new default), but an earlier explicit opt-out cannot be recovered and resets to the new default.
 
 ## End-to-end tests
 

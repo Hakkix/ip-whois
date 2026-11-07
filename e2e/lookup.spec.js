@@ -27,7 +27,7 @@ test.describe('IP lookup', () => {
     for (const id of ['network', 'asn', 'geo', 'dns', 'sources']) await expect(page.locator(`#section-${id}`)).toBeVisible();
     await expect(page.locator('#section-summary .summary-ptr')).toContainText('dns.example.net');
     await expect(page.locator('.warnings-banner')).toHaveCount(0);
-    await expect(page).toHaveURL(/[?&]q=8\.8\.8\.8/);
+    expect(new URL(page.url()).searchParams.has('q')).toBe(false);
     expect(errors).toEqual([]);
   });
 
@@ -122,5 +122,71 @@ test.describe('export and dialogs', () => {
     await page.keyboard.press('Escape');
     await expect(page.locator('#about-modal')).toBeHidden();
     await expect(page.locator('#about-btn')).toBeFocused();
+  });
+});
+
+test.describe('privacy: searches stay out of the URL by default', () => {
+  test('a fresh user searching does not generate ?q=', async ({ page }) => {
+    await installMocks(page);
+    await page.goto('/');
+    await expect(page.locator('#share-url')).not.toBeChecked();
+    await lookup(page, '8.8.8.8');
+    await expect(page.locator('#section-summary .summary-ip')).toContainText('8.8.8.8');
+    expect(new URL(page.url()).search).toBe('');
+  });
+
+  test('an explicit ?q= link still runs, then is removed from the address bar', async ({ page }) => {
+    await installMocks(page);
+    await page.goto('/?q=8.8.8.8');
+    await expect(page.locator('#section-summary .summary-ip')).toContainText('8.8.8.8');
+    expect(new URL(page.url()).search).toBe('');
+  });
+
+  test('a new search from a shared link does not leave the old ?q= behind', async ({ page }) => {
+    await installMocks(page);
+    await page.goto('/?q=8.8.8.8');
+    await expect(page.locator('#section-summary .summary-ip')).toContainText('8.8.8.8');
+    await page.evaluate(() => history.replaceState({}, '', '/?q=8.8.8.8'));
+    await lookup(page, '1.1.1.1');
+    await expect(page.locator('#section-summary .summary-ip')).toContainText('1.1.1.1');
+    expect(new URL(page.url()).search).toBe('');
+  });
+
+  test('opting in writes ?q=, keeps a shared link, and persists across reloads', async ({ page }) => {
+    await installMocks(page);
+    await page.goto('/');
+    await page.locator('#share-url').check();
+    await lookup(page, '8.8.8.8');
+    await expect(page).toHaveURL(/[?&]q=8\.8\.8\.8/);
+    await page.reload();
+    await expect(page.locator('#section-summary .summary-ip')).toContainText('8.8.8.8');
+    await expect(page.locator('#share-url')).toBeChecked();
+    await expect(page).toHaveURL(/[?&]q=8\.8\.8\.8/);
+  });
+
+  test('unticking the option removes ?q= from the current URL', async ({ page }) => {
+    await installMocks(page);
+    await page.goto('/');
+    await page.locator('#share-url').check();
+    await lookup(page, '8.8.8.8');
+    await expect(page).toHaveURL(/[?&]q=/);
+    await page.locator('#share-url').uncheck();
+    expect(new URL(page.url()).search).toBe('');
+  });
+
+  test('blocked localStorage does not break searching or the toggle', async ({ page }) => {
+    const errors = watchErrors(page);
+    await page.addInitScript(() => {
+      Object.defineProperty(window, 'localStorage', { get() { throw new DOMException('denied', 'SecurityError'); } });
+    });
+    await installMocks(page);
+    await page.goto('/');
+    await lookup(page, '8.8.8.8');
+    await expect(page.locator('#section-summary .summary-ip')).toContainText('8.8.8.8');
+    expect(new URL(page.url()).search).toBe('');
+    await page.locator('#share-url').check();
+    await lookup(page, '1.1.1.1');
+    await expect(page).toHaveURL(/[?&]q=1\.1\.1\.1/);
+    expect(errors).toEqual([]);
   });
 });
