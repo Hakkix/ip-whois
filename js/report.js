@@ -1,9 +1,11 @@
 // Builds the normalized v2 report model and renders it to JSON, Markdown,
 // and plain text. Every exporter reads only from the normalized model —
 // none of them know about RDAP, DNS, or geolocation provider shapes.
-import { isoNow, has } from './utils.js';
+import { isoNow, has, DNS_STATUS_LABEL } from './utils.js';
 
-const SCHEMA_VERSION = '2.1';
+// 2.2: dns.forward.status and dns.reverse.status added (ok | no_record |
+// error | not_applicable).
+const SCHEMA_VERSION = '2.2';
 
 const emptyNetwork = () => ({
   name: null, handle: null, type: null, start_address: null, end_address: null,
@@ -15,9 +17,14 @@ const emptyContacts = () => ({ abuse: [], technical: [], administrative: [], reg
 export function buildReport({
   input, queryType, hostname, forwardAddresses = [],
   ip, version, rdap = null, location = null, asn = null, reverse = null,
-  forwardSource = null, retrievedAt = {}, warnings = [],
+  forwardSource = null, forwardStatus = null, retrievedAt = {}, warnings = [],
 }) {
   const network = rdap ? rdap.network : emptyNetwork();
+  // A caller that knows the real outcome passes it; otherwise claim only what
+  // the data proves (an address/hostname implies a successful answer).
+  const fwdStatus = queryType !== 'hostname' ? 'not_applicable'
+    : forwardStatus ?? (forwardAddresses.length ? 'ok' : 'not_applicable');
+  const revStatus = reverse?.status ?? (reverse?.hostname ? 'ok' : 'not_applicable');
 
   return {
     schema_version: SCHEMA_VERSION,
@@ -30,8 +37,10 @@ export function buildReport({
     },
     ip: { address: ip, version },
     dns: {
-      forward: queryType === 'hostname' ? { hostname, addresses: forwardAddresses } : { hostname: null, addresses: [] },
-      reverse: { hostname: reverse ? reverse.hostname : null },
+      forward: queryType === 'hostname'
+        ? { hostname, addresses: forwardAddresses, status: fwdStatus }
+        : { hostname: null, addresses: [], status: fwdStatus },
+      reverse: { hostname: reverse ? reverse.hostname : null, status: revStatus },
     },
     network,
     asn: asn || null,
@@ -116,6 +125,8 @@ function dnsRows(r) {
   return [
     ['Query hostname', r.query.hostname], ['Resolved addresses', r.dns.forward.addresses.join(', ') || null],
     ['Reverse DNS (PTR)', r.dns.reverse.hostname],
+    ['Forward lookup', DNS_STATUS_LABEL[r.dns.forward.status] ?? null],
+    ['Reverse lookup', DNS_STATUS_LABEL[r.dns.reverse.status] ?? null],
   ];
 }
 

@@ -140,6 +140,7 @@
 .status-dot--available { background: var(--success); }
 .status-dot--loading { background: var(--warning); animation: pulse 1.4s ease-in-out infinite; }
 .status-dot--unavailable { background: var(--error); }
+.status-dot--idle { background: var(--text-muted); }
 @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: .35; } }
 
 .privacy-note { color: var(--text-muted); font-size: .85rem; margin: 0; }

@@ -243,3 +243,17 @@ export function toIsoOrNull(value) {
   const d = new Date(value);
   return Number.isNaN(d.getTime()) ? null : d.toISOString();
 }
+
+// Human-readable form of a DNS lookup status (see js/dns.js).
+export const DNS_STATUS_LABEL = {
+  ok: 'Resolved',
+  no_record: 'No record',
+  error: 'Lookup failed',
+};
+
+// The DNS source indicator is healthy only if at least one lookup actually ran
+// and none failed. "No record" is a valid answer, not a failure.
+export function dnsSourceOk(dns) {
+  const statuses = [dns.forward.status, dns.reverse.status];
+  return !statuses.includes('error') && statuses.some((s) => s === 'ok' || s === 'no_record');
+}

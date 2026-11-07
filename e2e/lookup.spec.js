@@ -85,6 +85,42 @@ test.describe('partial failures', () => {
   });
 });
 
+test.describe('DNS source status', () => {
+  const dohDown = () => ({ status: 503, body: '' });
+
+  test('DNS down: the report marks DNS unavailable instead of OK', async ({ page }) => {
+    await installMocks(page, { doh: dohDown });
+    await page.goto('/');
+    await lookup(page, '8.8.8.8');
+    await expect(page.locator('#section-summary')).toBeVisible();
+    await expect(page.locator('.source-item.is-missing', { hasText: 'DNS' })).toBeVisible();
+    await expect(page.locator('.warnings-banner')).toContainText('Reverse DNS');
+  });
+
+  test('a clean NXDOMAIN for the PTR is not a DNS failure', async ({ page }) => {
+    await installMocks(page, { doh: () => ({ status: 200, contentType: 'application/json', body: JSON.stringify({ Status: 3, Question: [{ type: 12 }] }) }) });
+    await page.goto('/');
+    await lookup(page, '8.8.8.8');
+    await expect(page.locator('#section-summary')).toBeVisible();
+    await expect(page.locator('.source-item.is-ok', { hasText: 'DNS' })).toBeVisible();
+    await expect(page.locator('.warnings-banner')).toHaveCount(0);
+  });
+
+  test('landing page: DNS dot turns unavailable when the PTR lookup fails', async ({ page }) => {
+    await installMocks(page, { doh: dohDown });
+    await page.goto('/');
+    await expect(page.locator('.self-ip-address')).toHaveText('93.184.216.34');
+    await expect(page.locator('#source-status-strip .status-item', { hasText: 'DNS' }).locator('.status-dot--unavailable')).toBeVisible();
+    await expect(page.locator('[data-tile=ptr]')).toContainText('unavailable');
+  });
+
+  test('landing page: DNS dot is available when the PTR lookup succeeds', async ({ page }) => {
+    await installMocks(page);
+    await page.goto('/');
+    await expect(page.locator('#source-status-strip .status-item', { hasText: 'DNS' }).locator('.status-dot--available')).toBeVisible();
+  });
+});
+
 test.describe('hostname lookup', () => {
   const twoAddresses = (url) => {
     const type = new URL(url).searchParams.get('type');

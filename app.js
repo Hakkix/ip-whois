@@ -240,7 +240,7 @@ function refreshRecentLookupsUI() {
 
 // ---- core investigation pipeline ----
 
-async function runIpInvestigation({ ip, version, queryType, hostname, forwardAddresses, forwardSource = null, displayQuery, pushUrl }) {
+async function runIpInvestigation({ ip, version, queryType, hostname, forwardAddresses, forwardSource = null, forwardStatus = null, displayQuery, pushUrl }) {
   const token = ++investigationToken;
   showInvestigation();
   renderLoading(els.investigationContainer, `Looking up registration, network location, and reverse DNS for ${ip}…`);
@@ -269,10 +269,13 @@ async function runIpInvestigation({ ip, version, queryType, hostname, forwardAdd
     warnings.push({ component: 'geolocation', message: 'Geolocation data is currently unavailable.' });
   }
 
-  const reverse = ptrSettled.status === 'fulfilled' ? ptrSettled.value : { hostname: null };
+  const reverse = ptrSettled.status === 'fulfilled' ? ptrSettled.value : { hostname: null, status: 'error' };
+  if (reverse.status === 'error') {
+    warnings.push({ component: 'dns', message: 'Reverse DNS lookup failed; absence of a PTR record below does not mean none exists.' });
+  }
 
   const report = buildReport({
-    input: displayQuery, queryType, hostname, forwardAddresses, forwardSource,
+    input: displayQuery, queryType, hostname, forwardAddresses, forwardSource, forwardStatus,
     ip, version, rdap: rdapNormalized, location, asn, reverse, retrievedAt, warnings,
   });
 
@@ -285,14 +288,14 @@ async function runIpInvestigation({ ip, version, queryType, hostname, forwardAdd
   if (pushUrl) pushUrlState(displayQuery);
 }
 
-function showChooserView(hostname, addresses, forwardSource, displayQuery, pushUrl) {
+function showChooserView(hostname, addresses, forwardSource, forwardStatus, displayQuery, pushUrl) {
   const token = ++investigationToken;
   showChooser();
   const refs = renderChooser(els.chooserView, addresses, (ip) => {
     if (token !== investigationToken) return;
     const version = ip.includes(':') ? 6 : 4;
     runIpInvestigation({
-      ip, version, queryType: 'hostname', hostname, forwardAddresses: addresses, forwardSource, displayQuery, pushUrl,
+      ip, version, queryType: 'hostname', hostname, forwardAddresses: addresses, forwardSource, forwardStatus, displayQuery, pushUrl,
     });
   });
   for (const ip of addresses) {
@@ -330,7 +333,9 @@ async function runInvestigationFromRaw(rawInput, opts = {}) {
     }
     if (token !== investigationToken) return;
     if (!resolved.addresses.length) {
-      renderError(els.investigationContainer, 'Could not resolve this hostname to an IP address.', classified.value);
+      renderError(els.investigationContainer, resolved.status === 'error'
+        ? 'DNS resolution failed. Please try again.'
+        : 'This hostname has no A or AAAA records.', classified.value);
       return;
     }
     // DNS answers are untrusted input: drop malformed and reserved addresses.
@@ -346,11 +351,11 @@ async function runInvestigationFromRaw(rawInput, opts = {}) {
       const ip = resolved.addresses[0];
       await runIpInvestigation({
         ip, version: ip.includes(':') ? 6 : 4, queryType: 'hostname', hostname: classified.value,
-        forwardAddresses: resolved.addresses, forwardSource: resolved.source, displayQuery, pushUrl,
+        forwardAddresses: resolved.addresses, forwardSource: resolved.source, forwardStatus: resolved.status, displayQuery, pushUrl,
       });
       return;
     }
-    showChooserView(classified.value, resolved.addresses, resolved.source, displayQuery, pushUrl);
+    showChooserView(classified.value, resolved.addresses, resolved.source, resolved.status, displayQuery, pushUrl);
     return;
   }
 
@@ -385,7 +390,8 @@ async function runSelfIpDetection(isRefresh = false) {
 
   if (!result) {
     selfView.setStatus('geoip', 'unavailable');
-    selfView.setStatus('dns', 'unavailable');
+    // No address was found, so no DNS lookup was attempted.
+    selfView.setStatus('dns', 'idle');
     if (isRefresh && previousIp) {
       showToast('Refresh failed', { tone: 'error' });
     } else {
@@ -410,8 +416,13 @@ async function runSelfIpDetection(isRefresh = false) {
   state.selfIp = { ip, version, asn, location, ptr: null };
 
   const reverse = await reversePTR(ip, version);
-  selfView.setPtr(reverse.hostname, reverse.hostname);
-  selfView.setStatus('dns', 'available');
+  if (reverse.status === 'error') {
+    selfView.setPtrUnavailable();
+    selfView.setStatus('dns', 'unavailable');
+  } else {
+    selfView.setPtr(reverse.hostname, reverse.hostname);
+    selfView.setStatus('dns', 'available');
+  }
   state.selfIp.ptr = reverse.hostname;
 
   if (isRefresh && previousIp && previousIp !== ip) {
