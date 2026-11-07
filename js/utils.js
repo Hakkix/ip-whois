@@ -13,60 +13,57 @@ function ipv4ToHexGroups(v4) {
   return [g1, g2];
 }
 
-export function validIPv6(raw) {
+// Strict RFC 4291 §2.2 parser. Returns eight lowercase 4-digit hex groups, or
+// null when the text is not a well-formed IPv6 literal. One optional pair of
+// surrounding brackets is accepted. Zone identifiers (%eth0) are rejected:
+// they are meaningless for a public lookup and must not be silently dropped.
+export function parseIPv6(raw) {
+  if (typeof raw !== 'string') return null;
   let s = raw.trim();
   if (s.startsWith('[') && s.endsWith(']')) s = s.slice(1, -1);
-  const zoneIdx = s.indexOf('%');
-  if (zoneIdx > -1) s = s.slice(0, zoneIdx);
-  if ((s.match(/::/g) || []).length > 1) return false;
-  const hasDoubleColon = s.includes('::');
-  const parts = s.split(':');
-  if (!hasDoubleColon && parts.length !== 8 && !s.includes('.')) return false;
-  let count = 0;
-  for (const part of parts) {
-    if (part === '') continue;
+  if (!/^[0-9a-fA-F:.]+$/.test(s)) return null;
+
+  const dc = s.indexOf('::');
+  if (dc !== s.lastIndexOf('::')) return null; // two "::", or ":::"
+  const split = (t) => (t === '' ? [] : t.split(':'));
+  const head = dc === -1 ? split(s) : split(s.slice(0, dc));
+  const tail = dc === -1 ? [] : split(s.slice(dc + 2));
+
+  const parts = [...head, ...tail];
+  const groups = [];
+  for (let i = 0; i < parts.length; i++) {
+    const part = parts[i];
     if (part.includes('.')) {
-      if (!validIPv4(part)) return false;
-      count += 2;
-      continue;
+      // An embedded IPv4 address is only valid as the final 32 bits.
+      if (i !== parts.length - 1 || !s.endsWith(part) || !validIPv4(part)) return null;
+      groups.push(...ipv4ToHexGroups(part));
+    } else if (/^[0-9a-fA-F]{1,4}$/.test(part)) {
+      groups.push(part.toLowerCase().padStart(4, '0'));
+    } else {
+      return null; // empty component, over-long group
     }
-    if (!/^[0-9a-fA-F]{1,4}$/.test(part)) return false;
-    count++;
   }
-  return hasDoubleColon ? count < 8 : count === 8;
+
+  if (dc === -1) return groups.length === 8 ? groups : null;
+  // "::" must stand for at least one group.
+  if (groups.length > 7) return null;
+  // The IPv4 tail is two groups, so split head/tail counts by group, not part.
+  const tailGroups = tail.length ? tail.reduce((n, p) => n + (p.includes('.') ? 2 : 1), 0) : 0;
+  const headGroups = groups.length - tailGroups;
+  return [...groups.slice(0, headGroups), ...Array(8 - groups.length).fill('0000'), ...groups.slice(headGroups)];
 }
 
-// Fully expands an IPv6 address into eight 4-hex-digit groups.
+export function validIPv6(raw) {
+  return parseIPv6(raw) !== null;
+}
+
+// Fully expands an IPv6 address into eight 4-hex-digit groups. Throws on
+// anything validIPv6() would reject, so no malformed address can reach PTR
+// generation or range arithmetic.
 export function expandIPv6(raw) {
-  let ip = raw.trim().toLowerCase();
-  if (ip.startsWith('[') && ip.endsWith(']')) ip = ip.slice(1, -1);
-  const zoneIdx = ip.indexOf('%');
-  if (zoneIdx > -1) ip = ip.slice(0, zoneIdx);
-
-  let head = [];
-  let tail = [];
-  if (ip.includes('::')) {
-    const [h, t] = ip.split('::');
-    head = h ? h.split(':') : [];
-    tail = t ? t.split(':') : [];
-  } else {
-    head = ip.split(':');
-  }
-
-  const target = tail.length ? tail : head;
-  if (target.length && target[target.length - 1].includes('.')) {
-    const v4 = target.pop();
-    target.push(...ipv4ToHexGroups(v4));
-  }
-
-  let groups;
-  if (ip.includes('::')) {
-    const missing = 8 - (head.length + tail.length);
-    groups = [...head, ...Array(Math.max(missing, 0)).fill('0'), ...tail];
-  } else {
-    groups = head;
-  }
-  return groups.map((g) => g.padStart(4, '0'));
+  const groups = parseIPv6(raw);
+  if (!groups) throw new RangeError(`Invalid IPv6 address: ${String(raw).slice(0, 64)}`);
+  return groups;
 }
 
 export function compressIPv6(groups) {
@@ -108,11 +105,13 @@ export function isValidHostname(raw) {
 // or null when the input is not an acceptable query.
 export function classifyInput(raw) {
   if (typeof raw !== 'string') return null;
-  let s = raw.trim();
-  if (!s) return null;
+  const trimmed = raw.trim();
+  if (!trimmed) return null;
+  // validIPv6 owns bracket handling, so it must see the original text.
+  if (validIPv6(trimmed)) return { type: 'ipv6', value: trimmed.replace(/^\[|\]$/g, '').toLowerCase() };
+  let s = trimmed;
   if (s.startsWith('[') && s.endsWith(']')) s = s.slice(1, -1);
   if (validIPv4(s)) return { type: 'ipv4', value: s };
-  if (validIPv6(s)) return { type: 'ipv6', value: s.toLowerCase() };
   const hostCandidate = s.toLowerCase().replace(/\.$/, '');
   if (isValidHostname(hostCandidate)) return { type: 'hostname', value: hostCandidate };
   return null;
