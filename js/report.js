@@ -1,7 +1,7 @@
 // Builds the normalized v2 report model and renders it to JSON, Markdown,
 // and plain text. Every exporter reads only from the normalized model —
 // none of them know about RDAP, DNS, or geolocation provider shapes.
-import { isoNow, has, DNS_STATUS_LABEL } from './utils.js';
+import { isoNow, has, DNS_STATUS_LABEL, hasValidCoords } from './utils.js';
 
 // 2.2: dns.forward.status and dns.reverse.status added (ok | no_record |
 // error | not_applicable).
@@ -117,7 +117,7 @@ function geoRows(r) {
   return [
     ['Country', l.country_code ? `${l.country} (${l.country_code})` : l.country],
     ['Region', l.region], ['City', l.city], ['Postal code', l.postal_code], ['Timezone', l.timezone],
-    ['Coordinates', has(l.latitude) && has(l.longitude) ? coords(l) : null], ['Provider', l.source],
+    ['Coordinates', hasValidCoords(l) ? coords(l) : null], ['Provider', l.source],
   ];
 }
 
@@ -171,7 +171,7 @@ export function reportToMarkdown(r) {
     out.push('## Geolocation', ...mdTable(geoRows(r)));
     out.push('> IP geolocation is approximate and represents network location,');
     out.push('> not the physical location of a person or device.');
-    if (has(r.location.latitude) && has(r.location.longitude)) out.push('', `[Open in OpenStreetMap](${osmUrl(r.location)})`);
+    if (hasValidCoords(r.location)) out.push('', `[Open in OpenStreetMap](${osmUrl(r.location)})`);
     out.push('');
   }
   out.push('## DNS', ...mdTable(dnsRows(r)), '');

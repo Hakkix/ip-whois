@@ -257,3 +257,13 @@ export function dnsSourceOk(dns) {
   const statuses = [dns.forward.status, dns.reverse.status];
   return !statuses.includes('error') && statuses.some((s) => s === 'ok' || s === 'no_record');
 }
+
+// Geographic coordinates are only usable when both are finite numbers inside
+// their valid ranges. Used before anything is displayed or sent to the map.
+export function validCoords(lat, lon) {
+  return typeof lat === 'number' && typeof lon === 'number'
+    && Number.isFinite(lat) && Number.isFinite(lon)
+    && lat >= -90 && lat <= 90 && lon >= -180 && lon <= 180;
+}
+
+export const hasValidCoords = (loc) => Boolean(loc) && validCoords(loc.latitude, loc.longitude);

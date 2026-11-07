@@ -4,7 +4,7 @@
 // never become markup or execute script. Links are only ever built from
 // URLs this app constructs itself or that pass `safeUrl()`.
 import { el, icon, ICONS, copyButton, safeLink, has } from './domkit.js';
-import { DNS_STATUS_LABEL, dnsSourceOk } from './utils.js';
+import { DNS_STATUS_LABEL, dnsSourceOk, hasValidCoords } from './utils.js';
 
 function kvRows(rows) {
   const wrap = el('div', { className: 'kv' });
@@ -179,7 +179,7 @@ function geoCard(r) {
   const c = el('article', { className: 'card', attrs: { id: 'section-geo' } }, [heading]);
   if (kv) c.appendChild(kv);
 
-  if (has(loc.latitude) && has(loc.longitude)) {
+  if (hasValidCoords(loc)) {
     const coordRow = el('div', { className: 'kv-coords' }, [
       el('span', { className: 'mono', text: coords(loc) }),
       copyButton(coords(loc), '', `Copy coordinates ${coords(loc)}`),

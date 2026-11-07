@@ -1,7 +1,7 @@
 import { classifyInput, isReservedIP, isoNow } from './js/utils.js';
 import { resolveHostname, reversePTR } from './js/dns.js';
 import { fetchRdap, normalizeRdap } from './js/rdap.js';
-import { fetchGeo, fetchSelfGeo, normalizeGeoResponse, normalizeAsn } from './js/geo.js';
+import { fetchGeo, fetchSelfGeo, normalizeGeoResponse, normalizeAsn, hasLocationData } from './js/geo.js';
 import { buildReport, reportToJSON, reportToMarkdown, reportToText } from './js/report.js';
 import { renderReport, renderLoading, renderError } from './js/render.js';
 import { createSelfIpView, renderRecentLookups } from './js/landing.js';
@@ -263,8 +263,10 @@ async function runIpInvestigation({ ip, version, queryType, hostname, forwardAdd
   let location = null;
   let asn = null;
   if (geoSettled.status === 'fulfilled' && geoSettled.value) {
-    location = normalizeGeoResponse(geoSettled.value.raw, geoSettled.value.provider);
+    const normalized = normalizeGeoResponse(geoSettled.value.raw, geoSettled.value.provider);
+    location = hasLocationData(normalized) ? normalized : null; // ASN-only answers carry no location
     asn = normalizeAsn(geoSettled.value.raw, geoSettled.value.provider);
+    if (!location) warnings.push({ component: 'geolocation', message: 'The provider returned no location data for this address.' });
   } else {
     warnings.push({ component: 'geolocation', message: 'Geolocation data is currently unavailable.' });
   }
@@ -405,7 +407,8 @@ async function runSelfIpDetection(isRefresh = false) {
 
   const { ip, raw, provider } = result;
   const version = ip.includes(':') ? 6 : 4;
-  const location = normalizeGeoResponse(raw, provider);
+  const normalizedLoc = normalizeGeoResponse(raw, provider);
+  const location = hasLocationData(normalizedLoc) ? normalizedLoc : null;
   const asn = normalizeAsn(raw, provider);
 
   selfView.setIp(ip, version);
